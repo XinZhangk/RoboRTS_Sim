@@ -17,6 +17,7 @@
 #include <nav_msgs/OccupancyGrid.h>
 #include <nav_msgs/Path.h>
 #include <geometry_msgs/PoseStamped.h>
+#include "roborts_msgs/ShootCmdSim.h"
 #include <ros/ros.h>
 
 #define THREAD_NUM 4 // ROS SPIN THREAD NUM
@@ -128,7 +129,13 @@ class SimNode {
     void PoseCallback4(const nav_msgs::Odometry::ConstPtr &pose_msg);
 
     void PublishPath(const std::vector<geometry_msgs::PoseStamped> &path);
-    void CheckLOS(int robot1, int robot2);
+    bool TryShoot(int robot1, int robot2);
+
+    bool ShootCmd(roborts_msgs::ShootCmdSim::Request &req,
+                  roborts_msgs::ShootCmdSim::Response &res);
+
+    void BulletDown(int robot, int num);
+    void HpDown(int robot, int damage);
     //void MapCallback(const nav_msgs::OccupancyGrid::ConstPtr &map_msg);
   private:
     //ROS Node handle
@@ -145,8 +152,14 @@ class SimNode {
 
     // service
     ros::ServiceClient static_map_srv_;
+    // service server that enables a shoot actions from a robot;
+    // request: enemy name (todo: change to enemy color for generalization), attacker name
+    // response: success or fail 
+    ros::ServiceServer shoot_srv_;
+
     // Status
     bool first_map_received_ = false;
+    bool is_showing_los_ = false;
 
     // Data
     std::vector<RobotInfo> robot_info_;

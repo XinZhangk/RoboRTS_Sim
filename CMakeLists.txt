@@ -9,6 +9,8 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   nav_msgs
   geometry_msgs
+  actionlib
+  roborts_msgs
   )
 
 find_package(Threads REQUIRED)
@@ -20,6 +22,8 @@ add_executable(
   sim_node.h
 )
 
+add_dependencies(sim_node
+  roborts_msgs_generate_messages)
 
 target_link_libraries(sim_node PUBLIC
         ${catkin_LIBRARIES}
@@ -29,3 +33,18 @@ target_include_directories(sim_node PUBLIC
         ${catkin_INCLUDE_DIRS}
 )
 
+add_executable(
+  sim_cmd_node
+  sim_cmd_node.cpp 
+)
+
+add_dependencies(sim_cmd_node
+  roborts_msgs_generate_messages)
+
+target_link_libraries(sim_cmd_node PUBLIC
+        ${catkin_LIBRARIES}
+)
+
+target_include_directories(sim_cmd_node PUBLIC
+        ${catkin_INCLUDE_DIRS}
+)
