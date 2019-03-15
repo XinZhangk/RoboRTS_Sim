@@ -18,10 +18,11 @@ bool SimNode::Init() {
   robot_info_.push_back(RobotInfo("r3", blue, 100, 50));
   robot_info_.push_back(RobotInfo("r4", blue, 100, 50));
 
-  sub_r1_ = nh_.subscribe("/r1/gazebo_robot_pose", 100, &SimNode::PoseCallback1, this);
-  sub_r2_ = nh_.subscribe("/r2/gazebo_robot_pose", 100, &SimNode::PoseCallback2, this);
-  sub_r3_ = nh_.subscribe("/r3/gazebo_robot_pose", 100, &SimNode::PoseCallback3, this);
-  sub_r4_ = nh_.subscribe("/r4/gazebo_robot_pose", 100, &SimNode::PoseCallback4, this);
+  sub_r1_ = nh_.subscribe<nav_msgs::Odometry>("/r1/gazebo_robot_pose", 100, boost::bind(&SimNode::PoseCallback,this,_1,1));
+  sub_r2_ = nh_.subscribe<nav_msgs::Odometry>("/r2/gazebo_robot_pose", 100, boost::bind(&SimNode::PoseCallback,this,_1,2));
+  sub_r3_ = nh_.subscribe<nav_msgs::Odometry>("/r3/gazebo_robot_pose", 100, boost::bind(&SimNode::PoseCallback,this,_1,3));
+  sub_r4_ = nh_.subscribe<nav_msgs::Odometry>("/r4/gazebo_robot_pose", 100, boost::bind(&SimNode::PoseCallback,this,_1,4));
+
   shoot_srv_ = nh_.advertiseService("shoot", &SimNode::ShootCmd, this);
 
   path_pub_ = nh_.advertise<nav_msgs::Path>("los_path", 10);
@@ -77,32 +78,13 @@ bool SimNode::TryShoot(int robot1, int robot2) {
   PublishPath(currentPath);
 }
 
-
-// todo: make the pose callback better and less repetitive
-void SimNode::PoseCallback1(const nav_msgs::Odometry::ConstPtr &pose_msg){
+// Use a universal pose callback method
+void SimNode::PoseCallback(const nav_msgs::Odometry::ConstPtr &pose_msg,const int topic){
   auto position = pose_msg->pose.pose.position;
   auto orientation = pose_msg->pose.pose.orientation;
-  robot_info_[0].pose = geometry_msgs::PoseWithCovariance(pose_msg->pose);
-  auto pose = robot_info_[0].pose;
-  //ROS_INFO("r1 has pose [%.4f ,%.4f ,%.4f]", pose.pose.position.x, pose.pose.position.y, pose.pose.position.z );
-}
-void SimNode::PoseCallback2(const nav_msgs::Odometry::ConstPtr &pose_msg){
-  auto position = pose_msg->pose.pose.position;
-  auto orientation = pose_msg->pose.pose.orientation;
-  robot_info_[1].pose = geometry_msgs::PoseWithCovariance(pose_msg->pose);
-  //ROS_INFO("r2 has pose [%.4f ,%.4f ,%.4f]", position.x, position.y, position.z );
-}
-void SimNode::PoseCallback3(const nav_msgs::Odometry::ConstPtr &pose_msg){
-  auto position = pose_msg->pose.pose.position;
-  auto orientation = pose_msg->pose.pose.orientation;
-  robot_info_[2].pose = geometry_msgs::PoseWithCovariance(pose_msg->pose);
-  //ROS_INFO("r3 has pose [%.4f ,%.4f ,%.4f]", position.x, position.y, position.z );
-}
-void SimNode::PoseCallback4(const nav_msgs::Odometry::ConstPtr &pose_msg){
-  auto position = pose_msg->pose.pose.position;
-  auto orientation = pose_msg->pose.pose.orientation;
-  robot_info_[3].pose = geometry_msgs::PoseWithCovariance(pose_msg->pose);
-  //ROS_INFO("r4 has pose [%.4f ,%.4f ,%.4f]", position.x, position.y, position.z );
+  robot_info_[topic-1].pose = geometry_msgs::PoseWithCovariance(pose_msg->pose);
+  auto pose = robot_info_[topic-1].pose;
+  //ROS_INFO("r[%d] has pose [%.4f ,%.4f ,%.4f]", topic,pose.pose.position.x, pose.pose.position.y, pose.pose.position.z );
 }
 
 bool SimNode::ShootCmd(roborts_msgs::ShootCmdSim::Request &req,

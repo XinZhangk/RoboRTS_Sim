@@ -70,7 +70,7 @@ class SimMap {
     			this->occ_cells_[i] = false;
     		}
       }
-	  }
+    }
 
     bool hasLineOfSight(double x1, double y1, double x2, double y2, std::vector<geometry_msgs::PoseStamped>& path) {
       ROS_INFO("check line of sight between (%.4f, %.4f) and (%.4f, %.4f)", x1, y1, x2, y2);
@@ -123,10 +123,7 @@ class SimNode {
     bool GetStaticMap();
     void StartSim();
 
-    void PoseCallback1(const nav_msgs::Odometry::ConstPtr &pose_msg);
-    void PoseCallback2(const nav_msgs::Odometry::ConstPtr &pose_msg);
-    void PoseCallback3(const nav_msgs::Odometry::ConstPtr &pose_msg);
-    void PoseCallback4(const nav_msgs::Odometry::ConstPtr &pose_msg);
+    void PoseCallback(const nav_msgs::Odometry::ConstPtr &pose_msg,const int topic);
 
     void PublishPath(const std::vector<geometry_msgs::PoseStamped> &path);
     bool TryShoot(int robot1, int robot2);
