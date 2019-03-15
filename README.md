@@ -38,4 +38,4 @@ When the r1's LOS is blocked by wall, the shooting will fail to deal damage.
 * add more functionality
 * fix the issue that bullet will shoot through other robots
 * integrate armor detection node, which works in simulation now ( thanks Guang)
-* many other things I cannot think of or articulate as it is getting very late and I desperately need sleep
+* check the comments to say some codes that can be improved

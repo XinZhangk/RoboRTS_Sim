@@ -29,7 +29,11 @@ int main(int argc, char **argv) {
     srv.request.robot = 1;
     srv.request.enemy = 2;
     if (client.call(srv)) {
-      ROS_INFO("Shooting is successful");
+      if (srv.response.success) {
+        ROS_INFO("Shot is successful");
+      } else {
+        ROS_INFO("Shot is blocked");
+      }
     } else {
       ROS_ERROR("Failed to call service shoot");
       return 1;

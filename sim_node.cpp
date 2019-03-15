@@ -13,6 +13,7 @@ bool SimNode::Init() {
   // request the static map
   GetStaticMap();
   // initilize robot informatoin
+  // ToDo: use better method to load up the parameters, by using either proto or the ROS parameter server
   robot_info_.push_back(RobotInfo("r1", red, 100, 50));
   robot_info_.push_back(RobotInfo("r2", red, 100, 50));
   robot_info_.push_back(RobotInfo("r3", blue, 100, 50));
@@ -52,9 +53,9 @@ void SimNode::PublishPath(const std::vector<geometry_msgs::PoseStamped> &path) {
   path_pub_.publish(path_);
 }
 
-void SimNode::StartSim() {
+// void SimNode::StartSim() {
 
-}
+// }
 
 void SimNode::BulletDown(int robot, int num) {
   robot_info_[robot-1].ammo -= num;
@@ -71,7 +72,11 @@ bool SimNode::TryShoot(int robot1, int robot2) {
   auto r2_pos = robot_info_[robot2-1].pose.pose.position;
   if (map_.hasLineOfSight(r1_pos.x, r1_pos.y, r2_pos.x, r2_pos.y, currentPath)){
     ROS_INFO("Robot %d and Robot %d can see each other", robot1, robot2);
-    HpDown(2, 1);
+    HpDown(robot2, 1);
+    // comment out bullet down for now. 
+    // ToDo: add service for decision node for checking the bullet count and reload.
+    // ToDo: add reload zone and reload functionality for the sim node
+    //BulletDown(robot1, 1);
   } else {
     ROS_INFO("Robot %d and Robot %d cannot see each other", robot1, robot2);
   }
@@ -98,7 +103,6 @@ bool SimNode::ShootCmd(roborts_msgs::ShootCmdSim::Request &req,
 } // roborts_sim
 
 int main(int argc, char **argv) {
-  //roborts_localization::GLogWrapper glog_wrapper(argv[0]);
   ros::init(argc, argv, "sim_node");
   roborts_sim::SimNode SimNode("sim_node");
   ros::AsyncSpinner async_spinner(THREAD_NUM);

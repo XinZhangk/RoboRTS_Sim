@@ -93,6 +93,8 @@ class SimMap {
         int index_x = static_cast<int>(pos_x/this->scale_);
         int index_y = static_cast<int>(pos_y/this->scale_);
         ROS_INFO("check %d, %d", index_x, index_y);
+        // todo: should also have checked if there is another robot in the way, in which case the 
+        // robot in between of the attacker and the target should be shot.
         if (occ_cells_[index_x+index_y*this->size_x_]) {
           return false;
         }
@@ -121,7 +123,7 @@ class SimNode {
   private:
     bool Init();
     bool GetStaticMap();
-    void StartSim();
+    //void StartSim();
 
     void PoseCallback(const nav_msgs::Odometry::ConstPtr &pose_msg,const int topic);
 
