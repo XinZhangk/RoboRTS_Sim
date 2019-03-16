@@ -13,11 +13,22 @@ bool SimNode::Init() {
   // request the static map
   GetStaticMap();
   // initilize robot informatoin
-  // ToDo: use better method to load up the parameters, by using either proto or the ROS parameter server
-  robot_info_.push_back(RobotInfo("r1", red, 100, 50));
-  robot_info_.push_back(RobotInfo("r2", red, 100, 50));
-  robot_info_.push_back(RobotInfo("r3", blue, 100, 50));
-  robot_info_.push_back(RobotInfo("r4", blue, 100, 50));
+  int hp,bullet;
+  std::vector<std::string> name_list;
+  if(nh_.getParam("/HP",hp) && nh_.getParam("/Bullet",bullet) && nh_.getParam("/NameList",name_list)){
+  ROS_INFO("robot parameters loaded");
+  }else{
+  ROS_ERROR("can not read robot parameters");
+  }
+  for(unsigned i=0;i<name_list.size();i++){
+    Color t;
+    if(i<name_list.size()/2){
+      t=red;
+    }else{
+      t=blue;
+    }
+    robot_info_.push_back(RobotInfo(name_list[i], t, bullet, hp));
+  }
 
   sub_r1_ = nh_.subscribe<nav_msgs::Odometry>("/r1/gazebo_robot_pose", 100, boost::bind(&SimNode::PoseCallback,this,_1,1));
   sub_r2_ = nh_.subscribe<nav_msgs::Odometry>("/r2/gazebo_robot_pose", 100, boost::bind(&SimNode::PoseCallback,this,_1,2));
@@ -27,7 +38,19 @@ bool SimNode::Init() {
   shoot_srv_ = nh_.advertiseService("shoot", &SimNode::ShootCmd, this);
 
   path_pub_ = nh_.advertise<nav_msgs::Path>("los_path", 10);
- 
+  
+  // Advertise Check Bullet service
+  check_bullet_srv_ = nh_.advertiseService("check_bullet",&SimNode::CheckBullet,this);
+  ROS_INFO("check bullet service ready"); 
+
+  return true;
+}
+
+// Check Bullet Service
+bool SimNode::CheckBullet(roborts_sim::CheckBullet::Request &req,roborts_sim::CheckBullet::Response &res){
+  res.remaining_bullet = robot_info_[req.robort_id-1].ammo;
+  ROS_INFO("request: robort %d remaining bullet",req.robort_id);
+  ROS_INFO("respnse: remaining bullet = %d",res.remaining_bullet);
   return true;
 }
 
@@ -74,7 +97,6 @@ bool SimNode::TryShoot(int robot1, int robot2) {
     ROS_INFO("Robot %d and Robot %d can see each other", robot1, robot2);
     HpDown(robot2, 1);
     // comment out bullet down for now. 
-    // ToDo: add service for decision node for checking the bullet count and reload.
     // ToDo: add reload zone and reload functionality for the sim node
     //BulletDown(robot1, 1);
   } else {

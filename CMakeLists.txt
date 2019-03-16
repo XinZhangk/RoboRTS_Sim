@@ -11,11 +11,23 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   actionlib
   roborts_msgs
+  std_msgs
+  message_generation
   )
 
 find_package(Threads REQUIRED)
 
-catkin_package()
+add_service_files(
+  FILES
+  CheckBullet.srv
+)
+
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
+
+catkin_package(CATKIN_DEPENDS message_runtime)
 add_executable(
   sim_node
   sim_node.cpp 

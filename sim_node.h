@@ -19,6 +19,7 @@
 #include <geometry_msgs/PoseStamped.h>
 #include "roborts_msgs/ShootCmdSim.h"
 #include <ros/ros.h>
+#include "roborts_sim/CheckBullet.h"
 
 #define THREAD_NUM 4 // ROS SPIN THREAD NUM
 namespace roborts_sim {
@@ -135,6 +136,7 @@ class SimNode {
 
     void BulletDown(int robot, int num);
     void HpDown(int robot, int damage);
+    bool CheckBullet(roborts_sim::CheckBullet::Request &req,roborts_sim::CheckBullet::Response &res);
     //void MapCallback(const nav_msgs::OccupancyGrid::ConstPtr &map_msg);
   private:
     //ROS Node handle
@@ -155,6 +157,7 @@ class SimNode {
     // request: enemy name (todo: change to enemy color for generalization), attacker name
     // response: success or fail 
     ros::ServiceServer shoot_srv_;
+    ros::ServiceServer check_bullet_srv_;
 
     // Status
     bool first_map_received_ = false;
