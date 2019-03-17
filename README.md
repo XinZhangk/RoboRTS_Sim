@@ -21,8 +21,7 @@ roslaunch roborts_bringup multibots_sim.launch
 ```
 * at terminal2, run
 ```bash
-export ROS_NAMESPACE='/r1'
-rosrun roborts_decision behavior_test_node
+ROS_NAMESPACE=/r1 rosrun roborts_decision behavior_test_node
 ```
 * at terminal3, run
 ```bash
