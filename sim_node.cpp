@@ -12,7 +12,7 @@ SimNode::SimNode(std::string name) {
 bool SimNode::Init() {
   // request the static map
   GetStaticMap();
-  // initilize robot informatoin
+  // initialize robot informatoin
   int hp,bullet;
   std::vector<std::string> name_list;
   if(nh_.getParam("/HP",hp) && nh_.getParam("/Bullet",bullet) && nh_.getParam("/NameList",name_list)){
@@ -47,10 +47,14 @@ bool SimNode::Init() {
 }
 
 // Check Bullet Service
+// I think the caller of this service should be the robot, in our simulation.
+// The rationale is that the whole weaponry system is controlled by the simulation node, virtually.
+// Although this is counter-intuitive as the robot is supposed to have full control over the bullets they shoot out,
+// I think it is easier programming-wise to consolidate all the combat information in the simulation node
 bool SimNode::CheckBullet(roborts_sim::CheckBullet::Request &req,roborts_sim::CheckBullet::Response &res){
-  res.remaining_bullet = robot_info_[req.robort_id-1].ammo;
-  ROS_INFO("request: robort %d remaining bullet",req.robort_id);
-  ROS_INFO("respnse: remaining bullet = %d",res.remaining_bullet);
+  res.remaining_bullet = robot_info_[req.robot_id-1].ammo;
+  ROS_INFO("request: robot %d remaining bullet",req.robot_id);
+  ROS_INFO("response: remaining bullet = %d",res.remaining_bullet);
   return true;
 }
 

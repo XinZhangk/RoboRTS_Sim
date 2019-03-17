@@ -3,6 +3,14 @@ This is simply a skeleton project for multiple robot simulation.
 Currently the code is written *very* badly, with little documentation and much repetitions. 
 Please improve the code quality and add more features.
 
+Note that since Daniel kindly added the function to generate messages within the package, we need to run message generation first to create the corresponding header files.
+At the workspace directory, run the following:
+```bash
+catkin_make roborts_sim_generate_messages
+catkin_make sim_node
+catkin_make sim_cmd_node
+```
+This will build all the necessary executables of simulation package.
 ## Run
 * Put the package under the same `src` directory as `RoboRTS-v2` and `gazebo_temp` repositories.
 * build the project
