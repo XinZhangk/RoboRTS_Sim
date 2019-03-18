@@ -133,7 +133,9 @@ class SimNode {
 
     bool ShootCmd(roborts_msgs::ShootCmdSim::Request &req,
                   roborts_msgs::ShootCmdSim::Response &res);
-
+    bool ReloadCmd(roborts_msgs::ReloadCmd::Request & 
+                  req, roborts_msgs::ReloadCmd::Response & res)
+                  
     void BulletDown(int robot, int num);
     void HpDown(int robot, int damage);
     bool CheckBullet(roborts_sim::CheckBullet::Request &req,roborts_sim::CheckBullet::Response &res);
@@ -159,6 +161,10 @@ class SimNode {
     ros::ServiceServer shoot_srv_;
     ros::ServiceServer check_bullet_srv_;
 
+    //reload srv
+    ros::ServiceServer reload_srv_;
+    int reloadTime[4] = {0,0,0,0};
+
     // Status
     bool first_map_received_ = false;
     bool is_showing_los_ = false;
@@ -167,6 +173,10 @@ class SimNode {
     std::vector<RobotInfo> robot_info_;
     SimMap map_;
     nav_msgs::Path path_;
+
+    //time
+    int m = 3;
+    int s = 0;
 };
 
 
