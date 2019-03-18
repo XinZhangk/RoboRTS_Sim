@@ -1,6 +1,5 @@
 # Simple Simulation (for RoboRTS)
 This is simply a skeleton project for multiple robot simulation. 
-Currently the code is written *very* badly, with little documentation and much repetitions. 
 Please improve the code quality and add more features.
 
 Note that since Daniel kindly added the function to generate messages within the package, we need to run message generation first to create the corresponding header files.
@@ -56,3 +55,19 @@ The simulation also relies on a functioning gazebo model that is able to move gi
 fixed on the chassis. 
 An update on `gazebo_temp` will be added soon to support this feature.
 
+
+# Simulation Road Map
+Although we can bring up four different robots in the same gazebo environment and each of the robots has its own namespace and tf_prefix, an accurate simulation is still lacking.
+To further illustrate the task, we shall inspect the current software structure of the real-world scenario.
+
+![robot software structure](/docs/imgs/robot_control_physical.png) 
+
+The key component that is replaced by the simulation is the `sensing/control` module.
+
+To be more specific, the simulation should be able to listen to the command given by the local planner (such as `cmd_vel_acc`, which controls the robot's movement), chassis and gimbal executor (move chassis and gimbal as requested), detection (tracking enemy by moving camera alongside with gimbal).
+On the other hand, simulation also has the responsibility to return information from odometry, camera and joints.
+
+# Proposed Simulation Model
+Our proposed simulation control contains three main components to replace the `sensing/control` module.
+* `gazebo`: gazebo with its plugins are able to publish odometry information (by mimicking sensor readings), emulate camera input, and laser sensor input, and of course the modelling of the robot and map; the code base for this component is located at `gazebo_temp`, managed by guang hu.
+* `sim_node`: simulation node plays the role of referee system and also takes commands from the sim base node.
