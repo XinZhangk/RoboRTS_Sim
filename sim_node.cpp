@@ -142,14 +142,14 @@ bool SimNode::ShootCmd(roborts_msgs::ShootCmdSim::Request &req,
   return true;
 }
 
-bool SimNode::ReloadCmd(roborts_msgs::ReloadCmd::Request & 
-                  req, roborts_msgs::ReloadCmd::Response & res){
+bool SimNode::ReloadCmd(roborts_sim::ReloadCmd::Request & 
+                  req, roborts_sim::ReloadCmd::Response & res){
   int robot = req.robot;
   res.success = TryReload(robot);
   return true;
 }
 
-bool SimNode::CountDown(){
+void SimNode::CountDown(){
   time_t t=time(NULL);//get current time
     while(m>=0){
         while(time(NULL)==t);

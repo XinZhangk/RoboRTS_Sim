@@ -20,6 +20,8 @@
 #include "roborts_msgs/ShootCmdSim.h"
 #include <ros/ros.h>
 #include "roborts_sim/CheckBullet.h"
+#include "roborts_sim/ReloadCmd.h"
+#include "roborts_sim/ShootCmd.h"
 
 #define THREAD_NUM 4 // ROS SPIN THREAD NUM
 namespace roborts_sim {
@@ -130,15 +132,17 @@ class SimNode {
 
     void PublishPath(const std::vector<geometry_msgs::PoseStamped> &path);
     bool TryShoot(int robot1, int robot2);
+    bool TryReload(int robot);
 
     bool ShootCmd(roborts_msgs::ShootCmdSim::Request &req,
                   roborts_msgs::ShootCmdSim::Response &res);
-    bool ReloadCmd(roborts_msgs::ReloadCmd::Request & 
-                  req, roborts_msgs::ReloadCmd::Response & res)
+    bool ReloadCmd(roborts_sim::ReloadCmd::Request &req, 
+                  roborts_sim::ReloadCmd::Response & res);
                   
     void BulletDown(int robot, int num);
     void HpDown(int robot, int damage);
     bool CheckBullet(roborts_sim::CheckBullet::Request &req,roborts_sim::CheckBullet::Response &res);
+    void CountDown();
     //void MapCallback(const nav_msgs::OccupancyGrid::ConstPtr &map_msg);
   private:
     //ROS Node handle

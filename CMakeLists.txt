@@ -21,7 +21,7 @@ add_service_files(
   FILES
   CheckBullet.srv
   ShootCmd.srv
-  RelaodCmd.srv
+  ReloadCmd.srv
 )
 
 generate_messages(
