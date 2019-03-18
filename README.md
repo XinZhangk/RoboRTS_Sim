@@ -41,8 +41,18 @@ Terminal4 is supposed to be a weaponry system, equipped with commands issued by 
 Also, when run rviz from r1's point of view, we can find a blue ray emanating from r1 toward r2 that indicates r1's line of sight (LOS).
 When the r1's LOS is blocked by wall, the shooting will fail to deal damage.
 
-## TODO
-* add more functionality
+## TODO (changed at 18th March)
+* add definition for the callback functions
 * fix the issue that bullet will shoot through other robots
-* integrate armor detection node, which works in simulation now ( thanks Guang)
-* check the comments to say some codes that can be improved
+* integrate armor detection node, which works in simulation now (thanks Guang)
+
+After some discussion and reflection, it is clear that our previous direction is not suitable for a simulation 
+upon which a decision node can be built for quick deployment on real-world robot.
+The key issue is that we use different protocols, and if the simulation uses the customized protocols, then deploy our code 
+to real robot will rise the issue of switching protocols.
+For example, now we cannot ask simulation node that robot 1 wants to shoot robot 2.
+
+The simulation also relies on a functioning gazebo model that is able to move gimbal, but on the correct model gimbal is
+fixed on the chassis. 
+An update on `gazebo_temp` will be added soon to support this feature.
+

@@ -13,37 +13,51 @@ bool SimNode::Init() {
   // request the static map
   GetStaticMap();
   // initialize robot informatoin
-  int hp,bullet;
+  int hp, ammo_count;
   std::vector<std::string> name_list;
-  if(nh_.getParam("/HP",hp) && nh_.getParam("/Bullet",bullet) && nh_.getParam("/NameList",name_list)){
-  ROS_INFO("robot parameters loaded");
+  std::vector<std::string> color_list;
+  if(nh_.getParam("/hp", hp) &&
+     nh_.getParam("/ammo", ammo_count) &&
+     nh_.getParam("/name_list", name_list) &&
+     nh_.getParam("/color_list", color_list)){
+    ROS_INFO("robot parameters loaded");
   }else{
-  ROS_ERROR("can not read robot parameters");
+    ROS_ERROR("can not read robot parameters");
   }
-  for(unsigned i=0;i<name_list.size();i++){
-    Color t;
-    if(i<name_list.size()/2){
-      t=red;
-    }else{
-      t=blue;
-    }
-    robot_info_.push_back(RobotInfo(name_list[i], t, bullet, hp));
+  // initialize robot information
+  for(unsigned i = 0; i < name_list.size(); i++){
+    Color color = StrToColor(color_list[i]);
+    robot_info_.push_back(RobotInfo(name_list[i], color, ammo_count, hp));
   }
 
-  sub_r1_ = nh_.subscribe<nav_msgs::Odometry>("/r1/gazebo_robot_pose", 100, boost::bind(&SimNode::PoseCallback,this,_1,1));
-  sub_r2_ = nh_.subscribe<nav_msgs::Odometry>("/r2/gazebo_robot_pose", 100, boost::bind(&SimNode::PoseCallback,this,_1,2));
-  sub_r3_ = nh_.subscribe<nav_msgs::Odometry>("/r3/gazebo_robot_pose", 100, boost::bind(&SimNode::PoseCallback,this,_1,3));
-  sub_r4_ = nh_.subscribe<nav_msgs::Odometry>("/r4/gazebo_robot_pose", 100, boost::bind(&SimNode::PoseCallback,this,_1,4));
+  // create subscribers and services
+  for (unsigned i = 0; i < robot_info_.size(); i++) {
+    // initialize subscribers and service severs
+    std::string pose_topic                = "/" + robot_info_[i].name + "/" + "gazebo_robot_pose";
+    std::string gimbal_angle_topic        = "/" + robot_info_[i].name + "/" + "cmd_gimbal_angle";
+    std::string gimbal_mode_service_name  = "/" + robot_info_[i].name + "/" + "set_gimbal_mode";
+    std::string fric_wheel_service_name   = "/" + robot_info_[i].name + "/" + "cmd_fric_wheel";
+    std::string gimbal_shoot_service_name = "/" + robot_info_[i].name + "/" + "cmd_shoot";
+    // fill up the vectors
+    gazebo_real_pose_sub_.push_back(nh_.subscribe<nav_msgs::Odometry>(pose_topic, 100, boost::bind(&SimNode::PoseCallback,this,_1,i)));
+    ros_gimbal_angle_sub_.push_back(nh_.subscribe(gimbal_angle_topic, 1, &SimNode::GimbalAngleCtrlCallback, this));
+    ros_gimbal_mode_srv_.push_back(nh_.advertiseService(gimbal_mode_service_name, &SimNode::SetGimbalModeService, this));
+    ros_ctrl_fric_wheel_srv_.push_back(nh_.advertiseService(fric_wheel_service_name, &SimNode::CtrlFricWheelService, this));
+    ros_ctrl_shoot_srv_.push_back(nh_.advertiseService(gimbal_shoot_service_name, &SimNode::CtrlShootService, this));
+  }
 
+  // for visualization
+  path_pub_ = nh_.advertise<nav_msgs::Path>("los_path", 10);
+
+
+  // following services are deprecated; we should stick to the protocols used
+  // on real robots, rather than define our own
   shoot_srv_ = nh_.advertiseService("shoot", &SimNode::ShootCmd, this);
-
   reload_srv_ = nh_.advertiseService("reload", &SimNode::ReloadCmd, this);
 
-  path_pub_ = nh_.advertise<nav_msgs::Path>("los_path", 10);
-  
   // Advertise Check Bullet service
   check_bullet_srv_ = nh_.advertiseService("check_bullet",&SimNode::CheckBullet,this);
-  ROS_INFO("check bullet service ready"); 
+  //ROS_INFO("check bullet service ready"); 
 
   std::thread(CountDown());
   return true;
@@ -62,11 +76,11 @@ bool SimNode::CheckBullet(roborts_sim::CheckBullet::Request &req,roborts_sim::Ch
 }
 
 bool SimNode::GetStaticMap(){
-  static_map_srv_ = nh_.serviceClient<nav_msgs::GetMap>("/static_map");
+  ros_static_map_srv_ = nh_.serviceClient<nav_msgs::GetMap>("/static_map");
   ros::service::waitForService("/static_map", -1);
   nav_msgs::GetMap::Request req;
   nav_msgs::GetMap::Response res;
-  if(static_map_srv_.call(req,res)) {
+  if(ros_static_map_srv_.call(req,res)) {
     ROS_INFO("Received Static Map");
     map_ = SimMap(res.map);
     first_map_received_ = true;
@@ -87,7 +101,7 @@ void SimNode::PublishPath(const std::vector<geometry_msgs::PoseStamped> &path) {
 
 // }
 
-void SimNode::BulletDown(int robot, int num) {
+void SimNode::AmmoDown(int robot, int num) {
   robot_info_[robot-1].ammo -= num;
 }
 void SimNode::HpDown(int robot, int damage){
@@ -105,7 +119,7 @@ bool SimNode::TryShoot(int robot1, int robot2) {
     HpDown(robot2, 1);
     // comment out bullet down for now. 
     // ToDo: add reload zone and reload functionality for the sim node
-    //BulletDown(robot1, 1);
+    //AmmoDown(robot1, 1);
   } else {
     ROS_INFO("Robot %d and Robot %d cannot see each other", robot1, robot2);
   }
@@ -126,14 +140,30 @@ bool SimNode::TryReload(int robot){
 
 
 // Use a universal pose callback method
-void SimNode::PoseCallback(const nav_msgs::Odometry::ConstPtr &pose_msg,const int topic){
+void SimNode::PoseCallback(const nav_msgs::Odometry::ConstPtr &pose_msg, const int robot_index){
   auto position = pose_msg->pose.pose.position;
   auto orientation = pose_msg->pose.pose.orientation;
-  robot_info_[topic-1].pose = geometry_msgs::PoseWithCovariance(pose_msg->pose);
-  auto pose = robot_info_[topic-1].pose;
+  robot_info_[robot_index].pose = geometry_msgs::PoseWithCovariance(pose_msg->pose);
+  //auto pose = robot_info_[robot_index].pose;
   //ROS_INFO("r[%d] has pose [%.4f ,%.4f ,%.4f]", topic,pose.pose.position.x, pose.pose.position.y, pose.pose.position.z );
 }
 
+void SimNode::GimbalAngleCtrlCallback(const roborts_msgs::GimbalAngle::ConstPtr &msg){}
+
+bool SimNode::SetGimbalModeService(roborts_msgs::GimbalMode::Request &req,
+                                  roborts_msgs::GimbalMode::Response &res){
+  return false;
+                                  }
+
+bool SimNode::CtrlFricWheelService(roborts_msgs::FricWhl::Request &req,
+                                  roborts_msgs::FricWhl::Response &res){
+  return false;                                    
+                                  }
+
+bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
+                              roborts_msgs::ShootCmd::Response &res){
+  return false;                                
+                              }
 bool SimNode::ShootCmd(roborts_msgs::ShootCmdSim::Request &req,
                   roborts_msgs::ShootCmdSim::Response &res){
   int robot1 = req.robot;

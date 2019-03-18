@@ -19,9 +19,18 @@
 #include <geometry_msgs/PoseStamped.h>
 #include "roborts_msgs/ShootCmdSim.h"
 #include <ros/ros.h>
+
 #include "roborts_sim/CheckBullet.h"
 #include "roborts_sim/ReloadCmd.h"
 #include "roborts_sim/ShootCmd.h"
+
+#include "roborts_msgs/GimbalAngle.h"
+#include "roborts_msgs/GimbalRate.h"
+
+#include "roborts_msgs/TwistAccel.h"
+#include "roborts_msgs/GimbalMode.h"
+#include "roborts_msgs/ShootCmd.h"
+#include "roborts_msgs/FricWhl.h"
 
 #define THREAD_NUM 4 // ROS SPIN THREAD NUM
 namespace roborts_sim {
@@ -31,6 +40,14 @@ namespace roborts_sim {
 //using Vec3d = Eigen::Vector3d;
 
 enum Color {red, blue};
+
+Color StrToColor(std::string color) {
+  if (color == "red") {
+    return red;
+  } else {
+    return blue;
+  }
+}
 
 struct RobotInfo {
   RobotInfo(std::string name, Color color, int ammo, int hp):
@@ -42,7 +59,7 @@ struct RobotInfo {
 
   // pose
   geometry_msgs::PoseWithCovariance pose;
-  // ammounication
+  // ammonation
   int ammo;
   // hit points
   int hp;
@@ -52,6 +69,7 @@ struct RobotInfo {
   Color color;
 };
 
+// todo: move SimMap out of header file
 class SimMap {
   public:
     SimMap(){}
@@ -128,8 +146,16 @@ class SimNode {
     bool GetStaticMap();
     //void StartSim();
 
-    void PoseCallback(const nav_msgs::Odometry::ConstPtr &pose_msg,const int topic);
 
+    void PoseCallback(const nav_msgs::Odometry::ConstPtr &pose_msg, const int robot_index);
+    // todo to be added after gimbal simulation is added to gazebo
+    void GimbalAngleCtrlCallback(const roborts_msgs::GimbalAngle::ConstPtr &msg);
+    bool SetGimbalModeService(roborts_msgs::GimbalMode::Request &req,
+                                  roborts_msgs::GimbalMode::Response &res);
+    bool CtrlFricWheelService(roborts_msgs::FricWhl::Request &req,
+                                  roborts_msgs::FricWhl::Response &res);
+    bool CtrlShootService(roborts_msgs::ShootCmd::Request &req,
+                              roborts_msgs::ShootCmd::Response &res);
     void PublishPath(const std::vector<geometry_msgs::PoseStamped> &path);
     bool TryShoot(int robot1, int robot2);
     bool TryReload(int robot);
@@ -139,46 +165,73 @@ class SimNode {
     bool ReloadCmd(roborts_sim::ReloadCmd::Request &req, 
                   roborts_sim::ReloadCmd::Response & res);
                   
-    void BulletDown(int robot, int num);
+    void AmmoDown(int robot, int num);
     void HpDown(int robot, int damage);
     bool CheckBullet(roborts_sim::CheckBullet::Request &req,roborts_sim::CheckBullet::Response &res);
     void CountDown();
-    //void MapCallback(const nav_msgs::OccupancyGrid::ConstPtr &map_msg);
   private:
     //ROS Node handle
     ros::NodeHandle nh_;
 
-    // ROS Subscriber
-    ros::Subscriber sub_r1_;
-    ros::Subscriber sub_r2_;
-    ros::Subscriber sub_r3_;
-    ros::Subscriber sub_r4_;
+    
+    /**
+     ******* ROS Subscriber *******
+     */
+    // listen to gazebo for the real poses
+    std::vector<ros::Subscriber> gazebo_real_pose_sub_;
+    // listen to gimbal executor from decision node and detection node
+    std::vector<ros::Subscriber> ros_gimbal_angle_sub_;
+    
+    // to be removed
+    // ros::Subscriber sub_r1_;
+    // ros::Subscriber sub_r2_;
+    // ros::Subscriber sub_r3_;
+    // ros::Subscriber sub_r4_;
 
-    // ROS Publisher
+    /**
+     ******* ROS Publisher *******
+     */
+    // publish visualization for the LOS
     ros::Publisher path_pub_;
 
-    // service
-    ros::ServiceClient static_map_srv_;
-    // service server that enables a shoot actions from a robot;
-    // request: enemy name (todo: change to enemy color for generalization), attacker name
-    // response: success or fail 
+    /**
+     ******* ROS Service *******
+     */
+    // static map client, needed for LOS test
+    ros::ServiceClient ros_static_map_srv_;
+    // ros service server for gimbal mode set
+    std::vector<ros::ServiceServer> ros_gimbal_mode_srv_;
+    // ros service server for friction wheel control
+    std::vector<ros::ServiceServer> ros_ctrl_fric_wheel_srv_;
+    // ros service server for gimbal shoot control
+    std::vector<ros::ServiceServer> ros_ctrl_shoot_srv_;
+    
+
     ros::ServiceServer shoot_srv_;
     ros::ServiceServer check_bullet_srv_;
-
     //reload srv
     ros::ServiceServer reload_srv_;
-    int reloadTime[4] = {0,0,0,0};
 
-    // Status
+    /**
+     ******* Status *******
+     */ 
     bool first_map_received_ = false;
     bool is_showing_los_ = false;
 
-    // Data
+    /**
+     ******* Data *******
+     */ 
     std::vector<RobotInfo> robot_info_;
     SimMap map_;
     nav_msgs::Path path_;
 
+    /**
+     ******* Misc *******
+     */ 
+    // unsure if the rest is necessary; also, please avoid 
+    // using array and stick to std:vector.
     //time
+    int reloadTime[4] = {0,0,0,0};
     int m = 3;
     int s = 0;
 };
