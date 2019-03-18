@@ -37,12 +37,15 @@ bool SimNode::Init() {
 
   shoot_srv_ = nh_.advertiseService("shoot", &SimNode::ShootCmd, this);
 
+  reload_srv_ = nh_.advertiseService("reload", &SimNode::ReloadCmd, this);
+
   path_pub_ = nh_.advertise<nav_msgs::Path>("los_path", 10);
   
   // Advertise Check Bullet service
   check_bullet_srv_ = nh_.advertiseService("check_bullet",&SimNode::CheckBullet,this);
   ROS_INFO("check bullet service ready"); 
 
+  std::thread(CountDown());
   return true;
 }
 
@@ -109,6 +112,19 @@ bool SimNode::TryShoot(int robot1, int robot2) {
   PublishPath(currentPath);
 }
 
+bool SimNode::TryReload(int robot){
+  ROS_INFO("Robot %d tries reloading.", robot);
+  if(reloadTime[robot-1] > 1){
+    ROS_INFO("Robot %d has reloaded for 2 times in 1 minute, failed.", robot);
+    return false;
+  }else{
+    reloadTime[robot-1]++;
+    ROS_INFO("Robot %d has reloaded for %d times in 1 minute, succeed.", robot, reloadTime[robot-1]);
+    return true;
+  }
+}
+
+
 // Use a universal pose callback method
 void SimNode::PoseCallback(const nav_msgs::Odometry::ConstPtr &pose_msg,const int topic){
   auto position = pose_msg->pose.pose.position;
@@ -124,6 +140,27 @@ bool SimNode::ShootCmd(roborts_msgs::ShootCmdSim::Request &req,
   int robot2 = req.enemy;
   res.success = TryShoot(robot1, robot2);
   return true;
+}
+
+bool SimNode::ReloadCmd(roborts_sim::ReloadCmd::Request & 
+                  req, roborts_sim::ReloadCmd::Response & res){
+  int robot = req.robot;
+  res.success = TryReload(robot);
+  return true;
+}
+
+void SimNode::CountDown(){
+  time_t t=time(NULL);//get current time
+    while(m>=0){
+        while(time(NULL)==t);
+        if(--s<0){
+            s=59;
+            m--;
+            for(int i = 0; i < 4; i++){
+              reloadTime[i] = 0;
+            }
+        }
+    }  
 }
 
 } // roborts_sim

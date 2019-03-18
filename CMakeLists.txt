@@ -20,6 +20,8 @@ find_package(Threads REQUIRED)
 add_service_files(
   FILES
   CheckBullet.srv
+  ShootCmd.srv
+  ReloadCmd.srv
 )
 
 generate_messages(

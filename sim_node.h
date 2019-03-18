@@ -20,6 +20,8 @@
 #include "roborts_msgs/ShootCmdSim.h"
 #include <ros/ros.h>
 #include "roborts_sim/CheckBullet.h"
+#include "roborts_sim/ReloadCmd.h"
+#include "roborts_sim/ShootCmd.h"
 
 #define THREAD_NUM 4 // ROS SPIN THREAD NUM
 namespace roborts_sim {
@@ -130,13 +132,17 @@ class SimNode {
 
     void PublishPath(const std::vector<geometry_msgs::PoseStamped> &path);
     bool TryShoot(int robot1, int robot2);
+    bool TryReload(int robot);
 
     bool ShootCmd(roborts_msgs::ShootCmdSim::Request &req,
                   roborts_msgs::ShootCmdSim::Response &res);
-
+    bool ReloadCmd(roborts_sim::ReloadCmd::Request &req, 
+                  roborts_sim::ReloadCmd::Response & res);
+                  
     void BulletDown(int robot, int num);
     void HpDown(int robot, int damage);
     bool CheckBullet(roborts_sim::CheckBullet::Request &req,roborts_sim::CheckBullet::Response &res);
+    void CountDown();
     //void MapCallback(const nav_msgs::OccupancyGrid::ConstPtr &map_msg);
   private:
     //ROS Node handle
@@ -159,6 +165,10 @@ class SimNode {
     ros::ServiceServer shoot_srv_;
     ros::ServiceServer check_bullet_srv_;
 
+    //reload srv
+    ros::ServiceServer reload_srv_;
+    int reloadTime[4] = {0,0,0,0};
+
     // Status
     bool first_map_received_ = false;
     bool is_showing_los_ = false;
@@ -167,6 +177,10 @@ class SimNode {
     std::vector<RobotInfo> robot_info_;
     SimMap map_;
     nav_msgs::Path path_;
+
+    //time
+    int m = 3;
+    int s = 0;
 };
 
 
