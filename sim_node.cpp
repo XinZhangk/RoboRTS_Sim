@@ -180,8 +180,14 @@ bool SimNode::ReloadCmd(roborts_sim::ReloadCmd::Request &
 }
 
 void SimNode::CountDown(){
-  time_t t=time(NULL);//get current time
+  ros::Publisher cd = nh_.advertise<roborts_sim::Countdown>("countdown", 1000);
+  roborts_sim::Countdown cdm;
+  cdm.gameState = "Countdown starts!";
+  ROS_INFO("Countdown starts!");
+  cd.publish(cdm);
+  time_t t;
     while(m>=0){
+      t = time(NULL);//get current time
         while(time(NULL)==t);
         if(--s<0){
             s=59;
@@ -190,7 +196,10 @@ void SimNode::CountDown(){
               reloadTime[i] = 0;
             }
         }
-    }  
+    } 
+  cdm.gameState = "Countdown ends!";
+  ROS_INFO("Countdown ends!");
+  cd.publish(cdm);
 }
 
 } // roborts_sim

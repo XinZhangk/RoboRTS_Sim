@@ -24,6 +24,11 @@ add_service_files(
   ReloadCmd.srv
 )
 
+add_message_files(
+  FILES
+  Countdown.msg
+)
+
 generate_messages(
   DEPENDENCIES
   std_msgs
@@ -62,3 +67,5 @@ target_link_libraries(sim_cmd_node PUBLIC
 target_include_directories(sim_cmd_node PUBLIC
         ${catkin_INCLUDE_DIRS}
 )
+
+
