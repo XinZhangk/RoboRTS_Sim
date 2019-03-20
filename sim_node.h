@@ -146,7 +146,7 @@ class SimNode {
     bool GetStaticMap();
     //void StartSim();
 
-
+    void InitializeRobotInfo();
     void PoseCallback(const nav_msgs::Odometry::ConstPtr &pose_msg, const int robot_index);
     // todo to be added after gimbal simulation is added to gazebo
     void GimbalAngleCtrlCallback(const roborts_msgs::GimbalAngle::ConstPtr &msg);

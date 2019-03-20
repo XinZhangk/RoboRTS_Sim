@@ -13,22 +13,8 @@ bool SimNode::Init() {
   // request the static map
   GetStaticMap();
   // initialize robot informatoin
-  int hp, ammo_count;
-  std::vector<std::string> name_list;
-  std::vector<std::string> color_list;
-  if(nh_.getParam("/hp", hp) &&
-     nh_.getParam("/ammo", ammo_count) &&
-     nh_.getParam("/name_list", name_list) &&
-     nh_.getParam("/color_list", color_list)){
-    ROS_INFO("robot parameters loaded");
-  }else{
-    ROS_ERROR("can not read robot parameters");
-  }
-  // initialize robot information
-  for(unsigned i = 0; i < name_list.size(); i++){
-    Color color = StrToColor(color_list[i]);
-    robot_info_.push_back(RobotInfo(name_list[i], color, ammo_count, hp));
-  }
+  InitializeRobotInfo();
+  
 
   // create subscribers and services
   for (unsigned i = 0; i < robot_info_.size(); i++) {
@@ -61,6 +47,29 @@ bool SimNode::Init() {
 
   std::thread(CountDown());
   return true;
+}
+
+void SimNode::InitializeRobotInfo(){
+  int hp, ammo_count;
+  std::vector<std::string> name_list = {"r1", "r2", "r3", "r4"};
+  std::vector<std::string> color_list = {"red", "red", "blue", "blue"};
+  nh_.param<int>("/hp", hp, 50);
+  nh_.param<int>("/ammo", ammo_count, 100);
+  nh_.param<std::vector<std::string>>("/name_list", name_list);
+  nh_.param<std::vector<std::string>>("/color_list", color_list);
+  // if(nh_.getParam("/hp", hp) &&
+  //    nh_.getParam("/ammo", ammo_count) &&
+  //    nh_.getParam("/name_list", name_list) &&
+  //    nh_.getParam("/color_list", color_list)){
+  //   ROS_INFO("robot parameters loaded");
+  // }else{
+  //   ROS_ERROR("cannot read robot parameters");
+  // }
+  // initialize robot information
+  for(unsigned i = 0; i < name_list.size(); i++){
+    Color color = StrToColor(color_list[i]);
+    robot_info_.push_back(RobotInfo(name_list[i], color, ammo_count, hp));
+  }
 }
 
 // Check Bullet Service
