@@ -57,15 +57,7 @@ void SimNode::InitializeRobotInfo(){
   nh_.param<int>("/ammo", ammo_count, 100);
   nh_.param<std::vector<std::string>>("/name_list", name_list);
   nh_.param<std::vector<std::string>>("/color_list", color_list);
-  // if(nh_.getParam("/hp", hp) &&
-  //    nh_.getParam("/ammo", ammo_count) &&
-  //    nh_.getParam("/name_list", name_list) &&
-  //    nh_.getParam("/color_list", color_list)){
-  //   ROS_INFO("robot parameters loaded");
-  // }else{
-  //   ROS_ERROR("cannot read robot parameters");
-  // }
-  // initialize robot information
+
   for(unsigned i = 0; i < name_list.size(); i++){
     Color color = StrToColor(color_list[i]);
     robot_info_.push_back(RobotInfo(name_list[i], color, ammo_count, hp));
