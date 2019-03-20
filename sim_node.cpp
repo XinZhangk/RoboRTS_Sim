@@ -45,6 +45,8 @@ bool SimNode::Init() {
   check_bullet_srv_ = nh_.advertiseService("check_bullet",&SimNode::CheckBullet,this);
   //ROS_INFO("check bullet service ready"); 
 
+// can't time be measured better than reading the machine time? Remember the wall time is not necessary
+// the simulation time! In simulation time may "pass" much slower due to performance reasons
   std::thread(CountDown());
   return true;
 }
