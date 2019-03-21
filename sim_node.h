@@ -170,6 +170,7 @@ class SimNode {
     void HpDown(int robot, int damage);
     bool CheckBullet(roborts_sim::CheckBullet::Request &req,roborts_sim::CheckBullet::Response &res);
     void CountDown();
+    void resetReload(const ros::TimerEvent&);
   private:
     //ROS Node handle
     ros::NodeHandle nh_;
@@ -232,9 +233,9 @@ class SimNode {
     // unsure if the rest is necessary; also, please avoid 
     // using array and stick to std:vector.
     //time
-    int reloadTime[4] = {0,0,0,0};
-    int m = 3;
-    int s = 0;
+    ros::Publisher cd;
+    std::vector<int> reloadTime;
+    ros::Timer timer;
 };
 
 

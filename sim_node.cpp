@@ -47,6 +47,8 @@ bool SimNode::Init() {
 
 // can't time be measured better than reading the machine time? Remember the wall time is not necessary
 // the simulation time! In simulation time may "pass" much slower due to performance reasons
+  cd = nh_.advertise<roborts_sim::Countdown>("countdown", 1000);
+
   std::thread(CountDown());
   return true;
 }
@@ -183,26 +185,29 @@ bool SimNode::ReloadCmd(roborts_sim::ReloadCmd::Request &
 }
 
 void SimNode::CountDown(){
-  ros::Publisher cd = nh_.advertise<roborts_sim::Countdown>("countdown", 1000);
+  reloadTime.push_back(0);
+  reloadTime.push_back(0);
+  reloadTime.push_back(0);
+  reloadTime.push_back(0);
   roborts_sim::Countdown cdm;
   cdm.gameState = "Countdown starts!";
   ROS_INFO("Countdown starts!");
   cd.publish(cdm);
-  time_t t;
-    while(m>=0){
-      t = time(NULL);//get current time
-        while(time(NULL)==t);
-        if(--s<0){
-            s=59;
-            m--;
-            for(int i = 0; i < 4; i++){
-              reloadTime[i] = 0;
-            }
-        }
-    } 
+  timer = nh_.createTimer(ros::Duration(60), &SimNode::resetReload, this);
+  ros::spinOnce();
+  timer = nh_.createTimer(ros::Duration(60), &SimNode::resetReload, this);
+  ros::spinOnce();
+  timer = nh_.createTimer(ros::Duration(60), &SimNode::resetReload, this);
+  ros::spinOnce();
   cdm.gameState = "Countdown ends!";
   ROS_INFO("Countdown ends!");
   cd.publish(cdm);
+}
+
+void SimNode::resetReload(const ros::TimerEvent&){
+  for(int i = 0; i < 4; i++){
+    reloadTime[i] = 0;
+  }
 }
 
 } // roborts_sim
