@@ -169,8 +169,10 @@ class SimNode {
     void AmmoDown(int robot, int num);
     void HpDown(int robot, int damage);
     bool CheckBullet(roborts_sim::CheckBullet::Request &req,roborts_sim::CheckBullet::Response &res);
+
     void CountDown();
     void resetReload(const ros::TimerEvent&);
+    void gameEnd(const ros::TimerEvent&);
   private:
     //ROS Node handle
     ros::NodeHandle nh_;
@@ -235,7 +237,7 @@ class SimNode {
     //time
     ros::Publisher cd;
     std::vector<int> reloadTime;
-    ros::Timer timer;
+    ros::Timer timer[3];
 };
 
 

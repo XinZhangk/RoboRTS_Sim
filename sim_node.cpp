@@ -49,7 +49,12 @@ bool SimNode::Init() {
 // the simulation time! In simulation time may "pass" much slower due to performance reasons
   cd = nh_.advertise<roborts_sim::Countdown>("countdown", 1000);
 
-  std::thread(CountDown());
+  reloadTime.push_back(0);
+  reloadTime.push_back(0);
+  reloadTime.push_back(0);
+  reloadTime.push_back(0);  
+  std::thread t(&SimNode::CountDown,this);
+  t.join();
   return true;
 }
 
@@ -167,8 +172,9 @@ bool SimNode::CtrlFricWheelService(roborts_msgs::FricWhl::Request &req,
 
 bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
                               roborts_msgs::ShootCmd::Response &res){
-  return false;                                
-                              }
+  return false;                  
+}
+
 bool SimNode::ShootCmd(roborts_msgs::ShootCmdSim::Request &req,
                   roborts_msgs::ShootCmdSim::Response &res){
   int robot1 = req.robot;
@@ -188,23 +194,16 @@ bool SimNode::ReloadCmd(roborts_sim::ReloadCmd::Request &
 }
 
 void SimNode::CountDown(){
-  reloadTime.push_back(0);
-  reloadTime.push_back(0);
-  reloadTime.push_back(0);
-  reloadTime.push_back(0);
   roborts_sim::Countdown cdm;
   cdm.gameState = "Game starts!";
   ROS_INFO("Game starts!");
   cd.publish(cdm);
-  timer = nh_.createTimer(ros::Duration(60), &SimNode::resetReload, this);
+  timer[0] = nh_.createTimer(ros::Duration(60), &SimNode::resetReload, this);
   ros::spinOnce();
-  timer = nh_.createTimer(ros::Duration(60), &SimNode::resetReload, this);
+  timer[1] = nh_.createTimer(ros::Duration(120), &SimNode::resetReload, this);
   ros::spinOnce();
-  timer = nh_.createTimer(ros::Duration(60), &SimNode::resetReload, this);
-  ros::spinOnce();
-  cdm.gameState = "Countdown ends!";
-  ROS_INFO("Countdown ends!");
-  cd.publish(cdm);
+  timer[2] = nh_.createTimer(ros::Duration(180), &SimNode::gameEnd, this);
+  ros::spin();
 }
 
 void SimNode::resetReload(const ros::TimerEvent&){
@@ -213,6 +212,12 @@ void SimNode::resetReload(const ros::TimerEvent&){
   }
 }
 
+void SimNode::gameEnd(const ros::TimerEvent&){
+  roborts_sim::Countdown cdm;
+  cdm.gameState = "Countdown ends!";
+  ROS_INFO("Countdown ends!");
+  cd.publish(cdm);
+}
 } // roborts_sim
 
 int main(int argc, char **argv) {
