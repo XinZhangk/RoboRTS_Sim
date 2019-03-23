@@ -196,6 +196,7 @@ bool SimNode::ReloadCmd(roborts_sim::ReloadCmd::Request &
 void SimNode::CountDown(){
   roborts_sim::Countdown cdm;
   cdm.gameState = "Game starts!";
+  cd.publish(cdm);
   ROS_INFO("Game starts!");
   cd.publish(cdm);
   timer[0] = nh_.createTimer(ros::Duration(60), &SimNode::resetReload, this);
