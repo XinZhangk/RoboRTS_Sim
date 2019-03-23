@@ -181,6 +181,9 @@ bool SimNode::ReloadCmd(roborts_sim::ReloadCmd::Request &
                   req, roborts_sim::ReloadCmd::Response & res){
   int robot = req.robot;
   res.success = TryReload(robot);
+  res.supply_projectile_id = 1;
+  res.supply_robot_id = req.robot;
+  res.supply_num = 50;
   return true;
 }
 
@@ -190,8 +193,8 @@ void SimNode::CountDown(){
   reloadTime.push_back(0);
   reloadTime.push_back(0);
   roborts_sim::Countdown cdm;
-  cdm.gameState = "Countdown starts!";
-  ROS_INFO("Countdown starts!");
+  cdm.gameState = "Game starts!";
+  ROS_INFO("Game starts!");
   cd.publish(cdm);
   timer = nh_.createTimer(ros::Duration(60), &SimNode::resetReload, this);
   ros::spinOnce();
