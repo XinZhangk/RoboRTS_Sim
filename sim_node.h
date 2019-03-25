@@ -68,6 +68,9 @@ struct RobotInfo {
   std::string name;
   // color
   Color color;
+  // reload time
+  int reload_time;
+
 };
 
 // todo: move SimMap out of header file
@@ -114,7 +117,7 @@ class SimMap {
 
         int index_x = static_cast<int>(pos_x/this->scale_);
         int index_y = static_cast<int>(pos_y/this->scale_);
-        ROS_INFO("check %d, %d", index_x, index_y);
+        //ROS_INFO("check %d, %d", index_x, index_y);
         // todo: should also have checked if there is another robot in the way, in which case the 
         // robot in between of the attacker and the target should be shot.
         if (occ_cells_[index_x+index_y*this->size_x_]) {
@@ -172,7 +175,7 @@ class SimNode {
 
     void CountDown();
     void resetReload(const ros::TimerEvent&);
-    void gameEnd(const ros::TimerEvent&);
+    void gameEnd(const ros::TimerEvent&, int i);
   private:
     //ROS Node handle
     ros::NodeHandle nh_;
@@ -197,6 +200,7 @@ class SimNode {
      */
     // publish visualization for the LOS
     ros::Publisher path_pub_;
+    std::vector<ros::Publisher> ros_countdown_pub_;
 
     /**
      ******* ROS Service *******
@@ -235,9 +239,10 @@ class SimNode {
     // unsure if the rest is necessary; also, please avoid 
     // using array and stick to std:vector.
     //time
-    ros::Publisher cd;
-    std::vector<int> reloadTime;
-    ros::Timer timer[3];
+    //ros::Publisher cd;
+    //std::vector<int> reloadTime;
+    ros::Timer reload_timer_;
+    std::vector<ros::Timer> countdown_timer_;
 };
 
 
