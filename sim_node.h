@@ -32,6 +32,7 @@
 #include "roborts_msgs/GimbalMode.h"
 #include "roborts_msgs/ShootCmd.h"
 #include "roborts_msgs/FricWhl.h"
+#include "roborts_msgs/RobotStatus.h"
 
 #define THREAD_NUM 4 // ROS SPIN THREAD NUM
 namespace roborts_sim {
@@ -40,7 +41,14 @@ namespace roborts_sim {
 // Use eigen3 as base data structure
 //using Vec3d = Eigen::Vector3d;
 
-enum Color {red, blue};
+// Define game environment constants
+const int INITIAL_HP = 2000;
+const int DAMAGE_PER_BULLET = 50;
+const int INITIAL_BULLET_AMOUNT = 40;
+const int PROJECTILE_SPEED = 25;
+const int ROBOT_NUM = 4;
+
+enum class Color {red, blue};
 
 Color StrToColor(std::string color) {
   if (color == "red") {
@@ -55,12 +63,14 @@ struct RobotInfo {
     name(name),
     color(color),
     ammo(ammo),
-    hp(hp)
-  {};
+    hp(hp),
+  {
+    barrel_heat = 0;
+  };
 
   // pose
   geometry_msgs::PoseWithCovariance pose;
-  // ammonation
+  // ammunition
   int ammo;
   // hit points
   int hp;
@@ -70,7 +80,8 @@ struct RobotInfo {
   Color color;
   // reload time
   int reload_time;
-
+  // barrel heat
+  int barrel_heat;
 };
 
 // todo: move SimMap out of header file
@@ -118,7 +129,7 @@ class SimMap {
         int index_x = static_cast<int>(pos_x/this->scale_);
         int index_y = static_cast<int>(pos_y/this->scale_);
         //ROS_INFO("check %d, %d", index_x, index_y);
-        // todo: should also have checked if there is another robot in the way, in which case the 
+        // todo: should also have checked if there is another robot in the way, in which case the
         // robot in between of the attacker and the target should be shot.
         if (occ_cells_[index_x+index_y*this->size_x_]) {
           return false;
@@ -139,7 +150,7 @@ class SimMap {
     int size_x_ = 0, size_y_ = 0;
     std::vector<bool> occ_cells_;
 };
-  
+
 
 class SimNode {
   public:
@@ -166,9 +177,9 @@ class SimNode {
 
     bool ShootCmd(roborts_msgs::ShootCmdSim::Request &req,
                   roborts_msgs::ShootCmdSim::Response &res);
-    bool ReloadCmd(roborts_sim::ReloadCmd::Request &req, 
+    bool ReloadCmd(roborts_sim::ReloadCmd::Request &req,
                   roborts_sim::ReloadCmd::Response & res);
-                  
+
     void AmmoDown(int robot, int num);
     void HpDown(int robot, int damage);
     bool CheckBullet(roborts_sim::CheckBullet::Request &req,roborts_sim::CheckBullet::Response &res);
@@ -176,11 +187,16 @@ class SimNode {
     void CountDown();
     void resetReload(const ros::TimerEvent&);
     void gameEnd(const ros::TimerEvent&, int i);
+
+    // Robot Status Publisher Relevant
+    void StartThread();
+    void StopThread();
+    void PublishRobotStatus(std::string robot_name);
   private:
     //ROS Node handle
     ros::NodeHandle nh_;
 
-    
+
     /**
      ******* ROS Subscriber *******
      */
@@ -188,7 +204,7 @@ class SimNode {
     std::vector<ros::Subscriber> gazebo_real_pose_sub_;
     // listen to gimbal executor from decision node and detection node
     std::vector<ros::Subscriber> ros_gimbal_angle_sub_;
-    
+
     // to be removed
     // ros::Subscriber sub_r1_;
     // ros::Subscriber sub_r2_;
@@ -201,6 +217,7 @@ class SimNode {
     // publish visualization for the LOS
     ros::Publisher path_pub_;
     std::vector<ros::Publisher> ros_countdown_pub_;
+    std::vector<ros::Publisher> ros_robot_status_pub_;
 
     /**
      ******* ROS Service *******
@@ -213,7 +230,7 @@ class SimNode {
     std::vector<ros::ServiceServer> ros_ctrl_fric_wheel_srv_;
     // ros service server for gimbal shoot control
     std::vector<ros::ServiceServer> ros_ctrl_shoot_srv_;
-    
+
 
     ros::ServiceServer shoot_srv_;
     ros::ServiceServer check_bullet_srv_;
@@ -222,21 +239,26 @@ class SimNode {
 
     /**
      ******* Status *******
-     */ 
+     */
     bool first_map_received_ = false;
     bool is_showing_los_ = false;
 
     /**
      ******* Data *******
-     */ 
+     */
     std::vector<RobotInfo> robot_info_;
     SimMap map_;
     nav_msgs::Path path_;
 
     /**
+     ******* Thread *****
+     */
+    std::vector<std::thread> robot_status_publisher_thread_;
+
+    /**
      ******* Misc *******
-     */ 
-    // unsure if the rest is necessary; also, please avoid 
+     */
+    // unsure if the rest is necessary; also, please avoid
     // using array and stick to std:vector.
     //time
     //ros::Publisher cd;
