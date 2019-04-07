@@ -20,6 +20,7 @@
 #include "roborts_msgs/ShootCmdSim.h"
 #include <ros/ros.h>
 
+// TODO: Use another header file to include such a bunch of protocol head files
 #include "roborts_sim/CheckBullet.h"
 #include "roborts_sim/ReloadCmd.h"
 #include "roborts_sim/ShootCmd.h"
@@ -36,7 +37,7 @@
 #include "roborts_msgs/RobotDamage.h"
 #include "roborts_msgs/RobotHeat.h"
 
-#define THREAD_NUM 4 // ROS SPIN THREAD NUM
+#define THREAD_NUM 8 // ROS SPIN THREAD NUM
 namespace roborts_sim {
 
 // base types
@@ -204,7 +205,8 @@ class SimNode {
     // shooting relevant
     void AddBarrelHeat(int robot);
     void PublishRobotHeat(int robot);
-    void SettleRobotHeat();
+    void SettleRobotHeat(int robot);
+    int ComputeBarrelDamage(int robot);
   private:
     //ROS Node handle
     ros::NodeHandle nh_;
@@ -265,7 +267,7 @@ class SimNode {
      */
     std::vector<std::thread> robot_status_publisher_thread_;
     std::vector<std::thread> robot_heat_publisher_thread_;
-    std::vector<std::thread> robot_medium_thread_
+    std::vector<std::thread> robot_medium_thread_;
 
     /**
      ******* Misc *******
@@ -278,6 +280,7 @@ class SimNode {
     ros::Timer reload_timer_;
     std::vector<ros::Timer> countdown_timer_;
     std::vector<ros::Timer> barrel_heat_timer_;
+    std::mutex mutex_;
 };
 
 

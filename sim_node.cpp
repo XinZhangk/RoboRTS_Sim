@@ -37,7 +37,7 @@ bool SimNode::Init() {
     ros_countdown_pub_.push_back(nh_.advertise<roborts_sim::Countdown>(countdown_topic_name, 1000));
     ros_robot_status_pub_.push_back(nh_.advertise<roborts_msgs::RobotStatus>(robot_status_topic_name, 30));
     ros_robot_damage_pub_.push_back(nh_.advertise<roborts_msgs::RobotStatus>(robot_damage_topic_name, 30));
-    ros_robot_heat_pub_.push_back(nh_.advertise<roborts_msgs::RobotStatus>(robot_heat_topic_name, 30))
+    ros_robot_heat_pub_.push_back(nh_.advertise<roborts_msgs::RobotStatus>(robot_heat_topic_name, 30));
   }
 
   // for visualization
@@ -97,7 +97,7 @@ bool SimNode::CheckBullet(roborts_sim::CheckBullet::Request &req,roborts_sim::Ch
 
 void SimNode::StartThread() {
   for(unsigned i = 0; i < ROBOT_NUM; i++) {
-    robot_medium_thread_.push_back(std::thread(&SimNode::ExecuteLoop, this, i))
+    robot_medium_thread_.push_back(std::thread(&SimNode::ExecuteLoop, this, i));
   }
 }
 
@@ -114,11 +114,11 @@ void SimNode::ExecuteLoop(int robot) {
   while (ros::ok()) {
     PublishRobotStatus(robot);
     PublishRobotHeat(robot);
+    SettleRobotHeat(robot);
     ros::spinOnce();
     r.sleep();
   }
 }
-
 
 void SimNode::PublishRobotStatus(int robot) {
   roborts_msgs::RobotStatus robot_status;
@@ -196,10 +196,35 @@ void SimNode::AddBarrelHeat(int robot) {
   }
 }
 
+void SimNode::SettleRobotHeat(int robot) {
+  std::lock_guard <std::mutex> guard(mutex_);
+  int barrel_heat = robot_info_[robot-1].barrel_heat;
+  int robot_hp = robot_info_[robot-1].hp;
+  if (barrel_heat > 720) {
+    ROS_WARN("There must be a synchronization problem.");
+  }
+  if (robot_hp >= 400) {
+    robot_info_[robot-1].barrel_heat -= static_cast<int>(BARREL_COOLING_RATE / 2);
+  } else {
+    robot_info_[robot-1].barrel_heat -= BARREL_COOLING_RATE;
+  }
+  HpDown(robot, ComputeBarrelDamage(barrel_heat), 2);
+}
+
+int SimNode::ComputeBarrelDamage(int barrel_heat) {
+  if (barrel_heat >= 720) {
+    return (barrel_heat - BARREL_HEAT_UPPERBOUND) * 40;
+  } else if (barrel_heat > 360) {
+    return (barrel_heat - BARREL_HEAT_LIMIT) * 4;
+  } else {
+    return 0;
+  }
+}
+
 void SimNode::HpDown(int robot, int damage, int damage_type){
   {
     std::lock_guard <std::mutex> guard(mutex_);
-    robot_info_[robot - 1].hp -= damage;
+    robot_info_[robot-1].hp -= damage;
   }
   ROS_INFO("Robot %d lost %d hit points", robot, damage);
   roborts_msgs::RobotDamage robot_damage;
