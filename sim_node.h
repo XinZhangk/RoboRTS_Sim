@@ -33,6 +33,7 @@
 #include "roborts_msgs/ShootCmd.h"
 #include "roborts_msgs/FricWhl.h"
 #include "roborts_msgs/RobotStatus.h"
+#include "roborts_msgs/RobotDamage.h"
 
 #define THREAD_NUM 4 // ROS SPIN THREAD NUM
 namespace roborts_sim {
@@ -45,10 +46,14 @@ namespace roborts_sim {
 const int INITIAL_HP = 2000;
 const int DAMAGE_PER_BULLET = 50;
 const int INITIAL_BULLET_AMOUNT = 40;
-const int PROJECTILE_SPEED = 25;
 const int ROBOT_NUM = 4;
+// barrel cooling relevant
+const int PROJECTILE_SPEED = 25;
+const int BARREL_HEAT_LIMIT = 360;
+const int BARREL_COOLING_RATE = 24;
+const int BARREL_COOLING_FEQ = 10;
 
-enum class Color {red, blue};
+enum Color {red, blue};
 
 Color StrToColor(std::string color) {
   if (color == "red") {
@@ -63,7 +68,7 @@ struct RobotInfo {
     name(name),
     color(color),
     ammo(ammo),
-    hp(hp),
+    hp(hp)
   {
     barrel_heat = 0;
   };
@@ -191,7 +196,9 @@ class SimNode {
     // Robot Status Publisher Relevant
     void StartThread();
     void StopThread();
-    void PublishRobotStatus(std::string robot_name);
+    void PublishRobotStatus(std::string &robot_name);
+
+    // shooting relevant
   private:
     //ROS Node handle
     ros::NodeHandle nh_;
@@ -205,19 +212,15 @@ class SimNode {
     // listen to gimbal executor from decision node and detection node
     std::vector<ros::Subscriber> ros_gimbal_angle_sub_;
 
-    // to be removed
-    // ros::Subscriber sub_r1_;
-    // ros::Subscriber sub_r2_;
-    // ros::Subscriber sub_r3_;
-    // ros::Subscriber sub_r4_;
-
     /**
      ******* ROS Publisher *******
      */
     // publish visualization for the LOS
     ros::Publisher path_pub_;
+
     std::vector<ros::Publisher> ros_countdown_pub_;
     std::vector<ros::Publisher> ros_robot_status_pub_;
+    std::vector<ros::Publisher> ros_robot_damage_pub_;
 
     /**
      ******* ROS Service *******

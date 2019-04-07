@@ -26,6 +26,7 @@ bool SimNode::Init() {
     std::string gimbal_shoot_service_name = "/" + robot_info_[i].name + "/" + "cmd_shoot";
     std::string countdown_topic_name      = "/" + robot_info_[i].name + "/" + "countdown";
     std::string robot_status_topic_name   = "/" + robot_info_[i].name + "/" + "robot_status";
+    std::string robot_damage_topic_name   = "/" + robot_info_[i].name + "/" + "robot_damage";
     // fill up the vectors
     gazebo_real_pose_sub_.push_back(nh_.subscribe<nav_msgs::Odometry>(pose_topic, 100, boost::bind(&SimNode::PoseCallback,this,_1,i)));
     ros_gimbal_angle_sub_.push_back(nh_.subscribe(gimbal_angle_topic, 1, &SimNode::GimbalAngleCtrlCallback, this));
@@ -34,6 +35,7 @@ bool SimNode::Init() {
     ros_ctrl_shoot_srv_.push_back(nh_.advertiseService(gimbal_shoot_service_name, &SimNode::CtrlShootService, this));
     ros_countdown_pub_.push_back(nh_.advertise<roborts_sim::Countdown>(countdown_topic_name, 1000));
     ros_robot_status_pub_.push_back(nh_.advertise<roborts_msgs::RobotStatus>(robot_status_topic_name, 30));
+    ros_robot_damage_pub_.push_back(nh_.advertise<roborts_msgs::RobotStatus>(robot_damage_topic_name, 30));
   }
 
   // for visualization
@@ -93,7 +95,7 @@ bool SimNode::CheckBullet(roborts_sim::CheckBullet::Request &req,roborts_sim::Ch
 
 void SimNode::StartThread() {
   for(unsigned i = 0; i < ROBOT_NUM; i++) {
-    robot_status_publisher_thread_.push_back(std::thread(&SimNode::PublishRobotStatus(robot_info_[i].name), this));
+    robot_status_publisher_thread_.push_back(std::thread(&SimNode::PublishRobotStatus, this, std::ref(robot_info_[i].name)));
   }
 }
 
@@ -105,33 +107,28 @@ void SimNode::StopThread() {
   }
 }
 
-void SimNode::PublishRobotStatus(std::string robot_name) {
+void SimNode::PublishRobotStatus(std::string &robot_name) {
   roborts_msgs::RobotStatus robot_status;
   // transform literal robot name to numeric id
-  switch (robot_name){
-    case "r1":
-      robot_status.id = 1;
-      robot_status.remain_hp = robot_info_[0].hp;
-      ros_robot_status_pub_[0].publish(robot_status);
-      break;
-    case "r2":
-      robot_status.id = 2;
-      robot_status.remain_hp = robot_info_[1].hp;
-      ros_robot_status_pub_[1].publish(robot_status);
-      break;
-    case "r3":
-      robot_status.id = 13;
-      robot_status.remain_hp = robot_info_[2].hp;
-      ros_robot_status_pub_[2].publish(robot_status);
-      break;
-    case "r4":
-      robot_status.id = 14;
-      robot_status.remain_hp = robot_info_[3].hp;
-      ros_robot_status_pub_[3].publish(robot_status);
-      break;
-    default:
-      LOG_ERROR<<"For AI challenge, please set robot id to Blue3/4 or Red3/4 in the referee system main control module";
-      return;
+  if (robot_name == "r1") {
+    robot_status.id = 1;
+    robot_status.remain_hp = robot_info_[0].hp;
+    ros_robot_status_pub_[0].publish(robot_status);
+  } else if (robot_name == "r2") {
+    robot_status.id = 2;
+    robot_status.remain_hp = robot_info_[1].hp;
+    ros_robot_status_pub_[1].publish(robot_status);
+  } else if (robot_name == "r3") {
+    robot_status.id = 13;
+    robot_status.remain_hp = robot_info_[2].hp;
+    ros_robot_status_pub_[2].publish(robot_status);
+  } else if (robot_name == "r4") {
+    robot_status.id = 14;
+    robot_status.remain_hp = robot_info_[3].hp;
+    ros_robot_status_pub_[3].publish(robot_status);
+  } else {
+    ROS_WARN("For AI challenge, please set robot id to Blue3/4 or Red3/4 in the referee system main control module");
+    return;
   }
 }
 
@@ -157,16 +154,15 @@ void SimNode::PublishPath(const std::vector<geometry_msgs::PoseStamped> &path) {
   path_pub_.publish(path_);
 }
 
-// void SimNode::StartSim() {
-
-// }
-
 void SimNode::AmmoDown(int robot, int num) {
   robot_info_[robot-1].ammo -= num;
 }
 void SimNode::HpDown(int robot, int damage){
   robot_info_[robot-1].hp -= damage;
   ROS_INFO("Robot %d lost %d hit points", robot, damage);
+  roborts_msgs::RobotDamage robot_damage;
+  robot_damage.damage_type = 0;
+  ros_robot_status_pub_[robot-1].publish(robot_damage);
   if (robot_info_[robot-1].hp < 0)
   {
     roborts_sim::Countdown cdm;
@@ -183,12 +179,14 @@ bool SimNode::TryShoot(int robot1, int robot2) {
   auto r2_pos = robot_info_[robot2-1].pose.pose.position;
   if (map_.hasLineOfSight(r1_pos.x, r1_pos.y, r2_pos.x, r2_pos.y, currentPath)){
     ROS_INFO("Robot %d and Robot %d can see each other", robot1, robot2);
-    HpDown(robot2, 1);
-    // comment out bullet down for now.
-    // ToDo: add reload zone and reload functionality for the sim node
-    AmmoDown(robot1, 1);
+    if (robot_info_[robot1-1].ammo > 0) {
+      HpDown(robot2, DAMAGE_PER_BULLET);
+      AmmoDown(robot1, 1);
+    } else {
+      ROS_WARN("Robot %d has no ammo but tries to shoot.", robot1);
+    }
   } else {
-    ROS_INFO("Robot %d and Robot %d cannot see each other", robot1, robot2);
+    ROS_WARN("Robot %d and Robot %d cannot see each other", robot1, robot2);
   }
   PublishPath(currentPath);
 }
@@ -203,7 +201,7 @@ bool SimNode::TryReload(int robot){
     robot_info_[robot-1].reload_time++;
     ROS_INFO("Robot %d has reloaded for %d times in 1 minute, succeed.", robot, robot_info_[robot-1].reload_time);
     sleep(5);
-    robot_info_[robot-1].ammo=50;
+    robot_info_[robot-1].ammo = 50;
     return true;
   }
 }
