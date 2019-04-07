@@ -34,6 +34,7 @@
 #include "roborts_msgs/FricWhl.h"
 #include "roborts_msgs/RobotStatus.h"
 #include "roborts_msgs/RobotDamage.h"
+#include "roborts_msgs/RobotHeat.h"
 
 #define THREAD_NUM 4 // ROS SPIN THREAD NUM
 namespace roborts_sim {
@@ -50,8 +51,9 @@ const int ROBOT_NUM = 4;
 // barrel cooling relevant
 const int PROJECTILE_SPEED = 25;
 const int BARREL_HEAT_LIMIT = 360;
+const int BARREL_HEAT_UPPERBOUND = 720;
 const int BARREL_COOLING_RATE = 24;
-const int BARREL_COOLING_FEQ = 10;
+const int BARREL_SETTLE_FEQ = 10;
 
 enum Color {red, blue};
 
@@ -186,19 +188,23 @@ class SimNode {
                   roborts_sim::ReloadCmd::Response & res);
 
     void AmmoDown(int robot, int num);
-    void HpDown(int robot, int damage);
+    void HpDown(int robot, int damage, int damage_type);
     bool CheckBullet(roborts_sim::CheckBullet::Request &req,roborts_sim::CheckBullet::Response &res);
 
     void CountDown();
     void resetReload(const ros::TimerEvent&);
     void gameEnd(const ros::TimerEvent&, int i);
 
-    // Robot Status Publisher Relevant
+    // Robot Status Publisher
     void StartThread();
     void StopThread();
-    void PublishRobotStatus(std::string &robot_name);
+    void ExecuteLoop(int robot);
+    void PublishRobotStatus(int robot);
 
     // shooting relevant
+    void AddBarrelHeat(int robot);
+    void PublishRobotHeat(int robot);
+    void SettleRobotHeat();
   private:
     //ROS Node handle
     ros::NodeHandle nh_;
@@ -221,6 +227,7 @@ class SimNode {
     std::vector<ros::Publisher> ros_countdown_pub_;
     std::vector<ros::Publisher> ros_robot_status_pub_;
     std::vector<ros::Publisher> ros_robot_damage_pub_;
+    std::vector<ros::Publisher> ros_robot_heat_pub_;
 
     /**
      ******* ROS Service *******
@@ -257,6 +264,8 @@ class SimNode {
      ******* Thread *****
      */
     std::vector<std::thread> robot_status_publisher_thread_;
+    std::vector<std::thread> robot_heat_publisher_thread_;
+    std::vector<std::thread> robot_medium_thread_
 
     /**
      ******* Misc *******
@@ -268,6 +277,7 @@ class SimNode {
     //std::vector<int> reloadTime;
     ros::Timer reload_timer_;
     std::vector<ros::Timer> countdown_timer_;
+    std::vector<ros::Timer> barrel_heat_timer_;
 };
 
 

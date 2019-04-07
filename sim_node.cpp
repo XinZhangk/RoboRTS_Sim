@@ -27,6 +27,7 @@ bool SimNode::Init() {
     std::string countdown_topic_name      = "/" + robot_info_[i].name + "/" + "countdown";
     std::string robot_status_topic_name   = "/" + robot_info_[i].name + "/" + "robot_status";
     std::string robot_damage_topic_name   = "/" + robot_info_[i].name + "/" + "robot_damage";
+    std::string robot_heat_topic_name     = "/" + robot_info_[i].name + "/" + "robot_heat";
     // fill up the vectors
     gazebo_real_pose_sub_.push_back(nh_.subscribe<nav_msgs::Odometry>(pose_topic, 100, boost::bind(&SimNode::PoseCallback,this,_1,i)));
     ros_gimbal_angle_sub_.push_back(nh_.subscribe(gimbal_angle_topic, 1, &SimNode::GimbalAngleCtrlCallback, this));
@@ -36,6 +37,7 @@ bool SimNode::Init() {
     ros_countdown_pub_.push_back(nh_.advertise<roborts_sim::Countdown>(countdown_topic_name, 1000));
     ros_robot_status_pub_.push_back(nh_.advertise<roborts_msgs::RobotStatus>(robot_status_topic_name, 30));
     ros_robot_damage_pub_.push_back(nh_.advertise<roborts_msgs::RobotStatus>(robot_damage_topic_name, 30));
+    ros_robot_heat_pub_.push_back(nh_.advertise<roborts_msgs::RobotStatus>(robot_heat_topic_name, 30))
   }
 
   // for visualization
@@ -95,34 +97,45 @@ bool SimNode::CheckBullet(roborts_sim::CheckBullet::Request &req,roborts_sim::Ch
 
 void SimNode::StartThread() {
   for(unsigned i = 0; i < ROBOT_NUM; i++) {
-    robot_status_publisher_thread_.push_back(std::thread(&SimNode::PublishRobotStatus, this, std::ref(robot_info_[i].name)));
+    robot_medium_thread_.push_back(std::thread(&SimNode::ExecuteLoop, this, i))
   }
 }
 
 void SimNode::StopThread() {
   for(unsigned i = 0; i < ROBOT_NUM; i++) {
-    if (robot_status_publisher_thread_[i].joinable()) {
-      robot_status_publisher_thread_[i].join();
+    if (robot_medium_thread_[i].joinable()) {
+      robot_medium_thread_[i].join();
     }
   }
 }
 
-void SimNode::PublishRobotStatus(std::string &robot_name) {
+void SimNode::ExecuteLoop(int robot) {
+  ros::Rate r(10);
+  while (ros::ok()) {
+    PublishRobotStatus(robot);
+    PublishRobotHeat(robot);
+    ros::spinOnce();
+    r.sleep();
+  }
+}
+
+
+void SimNode::PublishRobotStatus(int robot) {
   roborts_msgs::RobotStatus robot_status;
   // transform literal robot name to numeric id
-  if (robot_name == "r1") {
+  if (robot == 0) {
     robot_status.id = 1;
     robot_status.remain_hp = robot_info_[0].hp;
     ros_robot_status_pub_[0].publish(robot_status);
-  } else if (robot_name == "r2") {
+  } else if (robot == 1) {
     robot_status.id = 2;
     robot_status.remain_hp = robot_info_[1].hp;
     ros_robot_status_pub_[1].publish(robot_status);
-  } else if (robot_name == "r3") {
+  } else if (robot == 2) {
     robot_status.id = 13;
     robot_status.remain_hp = robot_info_[2].hp;
     ros_robot_status_pub_[2].publish(robot_status);
-  } else if (robot_name == "r4") {
+  } else if (robot == 3) {
     robot_status.id = 14;
     robot_status.remain_hp = robot_info_[3].hp;
     ros_robot_status_pub_[3].publish(robot_status);
@@ -130,6 +143,12 @@ void SimNode::PublishRobotStatus(std::string &robot_name) {
     ROS_WARN("For AI challenge, please set robot id to Blue3/4 or Red3/4 in the referee system main control module");
     return;
   }
+}
+
+void SimNode::PublishRobotHeat(int robot) {
+  roborts_msgs::RobotHeat robot_heat;
+  robot_heat.shooter_heat = robot_info_[robot-1].barrel_heat;
+  ros_robot_heat_pub_[robot-1].publish(robot_heat);
 }
 
 bool SimNode::GetStaticMap(){
@@ -155,13 +174,36 @@ void SimNode::PublishPath(const std::vector<geometry_msgs::PoseStamped> &path) {
 }
 
 void SimNode::AmmoDown(int robot, int num) {
-  robot_info_[robot-1].ammo -= num;
+  {
+    std::lock_guard <std::mutex> guard(mutex_);
+    robot_info_[robot - 1].ammo -= num;
+  }
+  AddBarrelHeat(robot);
 }
-void SimNode::HpDown(int robot, int damage){
-  robot_info_[robot-1].hp -= damage;
+
+void SimNode::AddBarrelHeat(int robot) {
+  int current_barrel_heat = robot_info_[robot-1].barrel_heat + PROJECTILE_SPEED;
+  if (current_barrel_heat <= BARREL_HEAT_UPPERBOUND) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    robot_info_[robot-1].barrel_heat = current_barrel_heat;
+  } else {
+    int overheat_damage = (current_barrel_heat - BARREL_HEAT_UPPERBOUND) * 40;
+    HpDown(robot, overheat_damage, 2);
+    {
+      std::lock_guard <std::mutex> guard(mutex_);
+      robot_info_[robot - 1].barrel_heat = BARREL_HEAT_UPPERBOUND;
+    }
+  }
+}
+
+void SimNode::HpDown(int robot, int damage, int damage_type){
+  {
+    std::lock_guard <std::mutex> guard(mutex_);
+    robot_info_[robot - 1].hp -= damage;
+  }
   ROS_INFO("Robot %d lost %d hit points", robot, damage);
   roborts_msgs::RobotDamage robot_damage;
-  robot_damage.damage_type = 0;
+  robot_damage.damage_type = damage_type;
   ros_robot_status_pub_[robot-1].publish(robot_damage);
   if (robot_info_[robot-1].hp < 0)
   {
@@ -180,7 +222,7 @@ bool SimNode::TryShoot(int robot1, int robot2) {
   if (map_.hasLineOfSight(r1_pos.x, r1_pos.y, r2_pos.x, r2_pos.y, currentPath)){
     ROS_INFO("Robot %d and Robot %d can see each other", robot1, robot2);
     if (robot_info_[robot1-1].ammo > 0) {
-      HpDown(robot2, DAMAGE_PER_BULLET);
+      HpDown(robot2, DAMAGE_PER_BULLET, 0);
       AmmoDown(robot1, 1);
     } else {
       ROS_WARN("Robot %d has no ammo but tries to shoot.", robot1);
