@@ -28,6 +28,7 @@ bool SimNode::Init() {
     std::string robot_status_topic_name   = "/" + robot_info_[i].name + "/" + "robot_status";
     std::string robot_damage_topic_name   = "/" + robot_info_[i].name + "/" + "robot_damage";
     std::string robot_heat_topic_name     = "/" + robot_info_[i].name + "/" + "robot_heat";
+    std::string reload_name               = "/" + robot_info_[i].name + "/" + "reload";
     // fill up the vectors
     gazebo_real_pose_sub_.push_back(nh_.subscribe<nav_msgs::Odometry>(pose_topic, 100, boost::bind(&SimNode::PoseCallback,this,_1,i)));
     ros_gimbal_angle_sub_.push_back(nh_.subscribe(gimbal_angle_topic, 1, &SimNode::GimbalAngleCtrlCallback, this));
@@ -38,6 +39,8 @@ bool SimNode::Init() {
     ros_robot_status_pub_.push_back(nh_.advertise<roborts_msgs::RobotStatus>(robot_status_topic_name, 30));
     ros_robot_damage_pub_.push_back(nh_.advertise<roborts_msgs::RobotStatus>(robot_damage_topic_name, 30));
     ros_robot_heat_pub_.push_back(nh_.advertise<roborts_msgs::RobotStatus>(robot_heat_topic_name, 30));
+    // fill up reload vector
+    reload_srv_.push_back(nh_.advertiseService<roborts_sim::ReloadCmd::Request, roborts_sim::ReloadCmd::Response>(reload_name, boost::bind(&SimNode::ReloadCmd,  this, _1, _2, i+1)));
   }
 
   // for visualization
@@ -47,7 +50,11 @@ bool SimNode::Init() {
   // following services are deprecated; we should stick to the protocols used
   // on real robots, rather than define our own
   shoot_srv_ = nh_.advertiseService("shoot", &SimNode::ShootCmd, this);
-  reload_srv_ = nh_.advertiseService("reload", &SimNode::ReloadCmd, this);
+
+  //for(int i = 1; i< 5; i++){
+    //std::string reload_namespace = "/r" + i + "/reload";
+    //reload_srv_.push_back(nh_.advertiseService(reload_namespace, boost::bind(&SimNode::ReloadCmd, _1, _2, i), this));
+  //}
 
   // Advertise Check Bullet service
   check_bullet_srv_ = nh_.advertiseService("check_bullet",&SimNode::CheckBullet,this);
@@ -308,9 +315,10 @@ bool SimNode::ShootCmd(roborts_msgs::ShootCmdSim::Request &req,
   return true;
 }
 
-bool SimNode::ReloadCmd(roborts_sim::ReloadCmd::Request &
-                  req, roborts_sim::ReloadCmd::Response & res){
-  int robot = req.robot;
+bool SimNode::ReloadCmd(roborts_sim::ReloadCmd::Request &req, 
+                  roborts_sim::ReloadCmd::Response &res,
+                  int robot){
+  //int robot = req.robot;
   res.success = TryReload(robot);
   res.supply_projectile_id = 1;
   res.supply_robot_id = req.robot;

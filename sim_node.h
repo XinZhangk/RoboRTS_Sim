@@ -186,7 +186,8 @@ class SimNode {
     bool ShootCmd(roborts_msgs::ShootCmdSim::Request &req,
                   roborts_msgs::ShootCmdSim::Response &res);
     bool ReloadCmd(roborts_sim::ReloadCmd::Request &req,
-                  roborts_sim::ReloadCmd::Response & res);
+                  roborts_sim::ReloadCmd::Response &res,
+                  int robot);
 
     void AmmoDown(int robot, int num);
     void HpDown(int robot, int damage, int damage_type);
@@ -247,7 +248,7 @@ class SimNode {
     ros::ServiceServer shoot_srv_;
     ros::ServiceServer check_bullet_srv_;
     //reload srv
-    ros::ServiceServer reload_srv_;
+    std::vector<ros::ServiceServer> reload_srv_;
 
     /**
      ******* Status *******
