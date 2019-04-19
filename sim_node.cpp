@@ -315,17 +315,10 @@ bool SimNode::ShootCmd(roborts_msgs::ShootCmdSim::Request &req,
   return true;
 }
 
-<<<<<<< Updated upstream
 bool SimNode::ReloadCmd(roborts_sim::ReloadCmd::Request &req, 
                   roborts_sim::ReloadCmd::Response &res,
                   int robot){
   //int robot = req.robot;
-=======
-bool SimNode::ReloadCmd(roborts_sim::ReloadCmd::Request &req,
-                        roborts_sim::ReloadCmd::Response &res,
-                        int robot){
-//  int robot = req.robot;
->>>>>>> Stashed changes
   res.success = TryReload(robot);
   res.supply_projectile_id = 1;
   res.supply_robot_id = req.robot;
