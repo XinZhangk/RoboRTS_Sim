@@ -37,8 +37,8 @@ bool SimNode::Init() {
     ros_ctrl_shoot_srv_.push_back(nh_.advertiseService(gimbal_shoot_service_name, &SimNode::CtrlShootService, this));
     ros_countdown_pub_.push_back(nh_.advertise<roborts_sim::Countdown>(countdown_topic_name, 1000));
     ros_robot_status_pub_.push_back(nh_.advertise<roborts_msgs::RobotStatus>(robot_status_topic_name, 30));
-    ros_robot_damage_pub_.push_back(nh_.advertise<roborts_msgs::RobotStatus>(robot_damage_topic_name, 30));
-    ros_robot_heat_pub_.push_back(nh_.advertise<roborts_msgs::RobotStatus>(robot_heat_topic_name, 30));
+    ros_robot_damage_pub_.push_back(nh_.advertise<roborts_msgs::RobotDamage>(robot_damage_topic_name, 30));
+    ros_robot_heat_pub_.push_back(nh_.advertise<roborts_msgs::RobotHeat>(robot_heat_topic_name, 30));
     // fill up reload vector
     reload_srv_.push_back(nh_.advertiseService<roborts_sim::ReloadCmd::Request, roborts_sim::ReloadCmd::Response>(reload_name, boost::bind(&SimNode::ReloadCmd,  this, _1, _2, i+1)));
   }
@@ -315,10 +315,17 @@ bool SimNode::ShootCmd(roborts_msgs::ShootCmdSim::Request &req,
   return true;
 }
 
+<<<<<<< Updated upstream
 bool SimNode::ReloadCmd(roborts_sim::ReloadCmd::Request &req, 
                   roborts_sim::ReloadCmd::Response &res,
                   int robot){
   //int robot = req.robot;
+=======
+bool SimNode::ReloadCmd(roborts_sim::ReloadCmd::Request &req,
+                        roborts_sim::ReloadCmd::Response &res,
+                        int robot){
+//  int robot = req.robot;
+>>>>>>> Stashed changes
   res.success = TryReload(robot);
   res.supply_projectile_id = 1;
   res.supply_robot_id = req.robot;
@@ -355,9 +362,8 @@ void SimNode::CountDown(){
 void SimNode::resetReload(const ros::TimerEvent&){
   for(int i = 0; i < robot_info_.size(); i++){
     robot_info_[i].reload_time = 0;
-
   }
-  ROS_WARN("Resetting reload");
+  ROS_INFO("Resetting reload");
 }
 
 void SimNode::gameEnd(const ros::TimerEvent&, int i){
