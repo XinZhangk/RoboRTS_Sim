@@ -29,6 +29,8 @@ bool SimNode::Init() {
     std::string robot_damage_topic_name   = "/" + robot_info_[i].name + "/" + "robot_damage";
     std::string robot_heat_topic_name     = "/" + robot_info_[i].name + "/" + "robot_heat";
     std::string reload_name               = "/" + robot_info_[i].name + "/" + "reload";
+    std::string bonus_topic               = "/" + robot_info_[i].name + "/" + "bonus";
+    std::string game_status_topic         = "/" + robot_info_[i].name + "/" + "game_status";
     // fill up the vectors
     gazebo_real_pose_sub_.push_back(nh_.subscribe<nav_msgs::Odometry>(pose_topic, 100, boost::bind(&SimNode::PoseCallback,this,_1,i)));
     ros_gimbal_angle_sub_.push_back(nh_.subscribe(gimbal_angle_topic, 1, &SimNode::GimbalAngleCtrlCallback, this));
@@ -39,10 +41,11 @@ bool SimNode::Init() {
     ros_robot_status_pub_.push_back(nh_.advertise<roborts_msgs::RobotStatus>(robot_status_topic_name, 30));
     ros_robot_damage_pub_.push_back(nh_.advertise<roborts_msgs::RobotDamage>(robot_damage_topic_name, 30));
     ros_robot_heat_pub_.push_back(nh_.advertise<roborts_msgs::RobotHeat>(robot_heat_topic_name, 30));
+    ros_robot_bonus_pub_.push_back(nh_.advertise<roborts_msgs::RobotBonus>(bonus_topic,30));
+    ros_robot_game_status_pub_.push_back(nh_.advertise<roborts_msgs::GameStatus>(game_status_topic, 30));
     // fill up reload vector
     reload_srv_.push_back(nh_.advertiseService<roborts_sim::ReloadCmd::Request, roborts_sim::ReloadCmd::Response>(reload_name, boost::bind(&SimNode::ReloadCmd,  this, _1, _2, i+1)));
   }
-
   // for visualization
   path_pub_ = nh_.advertise<nav_msgs::Path>("los_path", 10);
 
@@ -60,18 +63,18 @@ bool SimNode::Init() {
   check_bullet_srv_ = nh_.advertiseService("check_bullet",&SimNode::CheckBullet,this);
   //ROS_INFO("check bullet service ready");
 
-// can't time be measured better than reading the machine time? Remember the wall time is not necessary
-// the simulation time! In simulation time may "pass" much slower due to performance reasons
-  //cd = nh_.advertise<roborts_sim::Countdown>("countdown", 1000);
-
   // reloadTime.push_back(0);
   // reloadTime.push_back(0);
   // reloadTime.push_back(0);
   // reloadTime.push_back(0);
 
-  CountDown();
-  //std::thread t(&SimNode::CountDown,this);
-  //t.join();
+  //CountDown();
+
+  std::thread game_thread(&SimNode::GameCountDown, this);
+  game_thread.detach();
+  
+  //StartThread();
+
   return true;
 }
 
@@ -122,6 +125,7 @@ void SimNode::ExecuteLoop(int robot) {
     PublishRobotStatus(robot);
     PublishRobotHeat(robot);
     SettleRobotHeat(robot);
+    
     ros::spinOnce();
     r.sleep();
   }
@@ -180,6 +184,12 @@ void SimNode::PublishPath(const std::vector<geometry_msgs::PoseStamped> &path) {
   path_pub_.publish(path_);
 }
 
+void SimNode::PublishGameStatus(int robot){
+  roborts_msgs::GameStatus gsmsg;
+  gsmsg.remaining_time = remaining_time;
+  ros_robot_game_status_pub_[robot].publish(gsmsg);
+}
+
 void SimNode::AmmoDown(int robot, int num) {
   {
     std::lock_guard <std::mutex> guard(mutex_);
@@ -220,7 +230,7 @@ void SimNode::SettleRobotHeat(int robot) {
 
 int SimNode::ComputeBarrelDamage(int barrel_heat) {
   if (barrel_heat >= 720) {
-    return (barrel_heat - BARREL_HEAT_UPPERBOUND) * 40;
+    return (barrel_heat - BARREL_HEAT_UPPERBOUND) * 40;ROS_WARN
   } else if (barrel_heat > 360) {
     return (barrel_heat - BARREL_HEAT_LIMIT) * 4;
   } else {
@@ -335,21 +345,24 @@ void SimNode::CountDown(){
   // for (auto & pub : ros_countdown_pub_) {
   //   pub.publish(cdm);
   // }
-  reload_timer_ = nh_.createTimer(ros::Duration(60), &SimNode::resetReload, this);
+  
   //ros::spinOnce();
   //ros::spin();
   //nh_.createTimer(ros::Duration(120), &SimNode::resetReload, this);
   //ros::spinOnce();
-  ros::spinOnce();
+  
 
     //cd.publish(cdm);
+  
   for (int i = 0; i < ros_countdown_pub_.size(); i ++) {
     ros_countdown_pub_[i].publish(cdm);
+    ROS_INFO("%s", cdm.gameState.c_str());
     countdown_timer_.push_back(nh_.createTimer(ros::Duration(180), boost::bind(&SimNode::gameEnd, this, _1, i)));
     ros::spinOnce();
     //ros::spin();
   }
-
+  reload_timer_ = nh_.createTimer(ros::Duration(60), &SimNode::resetReload, this);
+  ros::spinOnce();
 }
 
 void SimNode::resetReload(const ros::TimerEvent&){
@@ -366,6 +379,22 @@ void SimNode::gameEnd(const ros::TimerEvent&, int i){
   ros_countdown_pub_[i].publish(cdm);
 }
 
+void SimNode::GameCountDown(){
+  ros::Rate r(1);
+  while(ros::ok()){
+    for(int i = 0; i < ROBOT_NUM; i++){
+      PublishGameStatus(i);
+    }
+    remaining_time--;
+    if(remaining_time == 0){
+      for(int i = 0; i < ROBOT_NUM; i++){
+        PublishGameStatus(i);
+      }
+      return;
+    }
+    r.sleep();
+  }
+}
 } // roborts_sim
 
 int main(int argc, char **argv) {

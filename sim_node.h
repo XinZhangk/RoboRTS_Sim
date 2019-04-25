@@ -36,6 +36,9 @@
 #include "roborts_msgs/RobotStatus.h"
 #include "roborts_msgs/RobotDamage.h"
 #include "roborts_msgs/RobotHeat.h"
+#include "roborts_msgs/RobotBonus.h"
+#include "roborts_msgs/SupplierStatus.h"
+#include "roborts_msgs/GameStatus.h"
 
 #define THREAD_NUM 8 // ROS SPIN THREAD NUM
 namespace roborts_sim {
@@ -194,6 +197,7 @@ class SimNode {
     bool CheckBullet(roborts_sim::CheckBullet::Request &req,roborts_sim::CheckBullet::Response &res);
 
     void CountDown();
+    void GameCountDown();
     void resetReload(const ros::TimerEvent&);
     void gameEnd(const ros::TimerEvent&, int i);
 
@@ -202,6 +206,7 @@ class SimNode {
     void StopThread();
     void ExecuteLoop(int robot);
     void PublishRobotStatus(int robot);
+    void PublishGameStatus(int robot);
 
     // shooting relevant
     void AddBarrelHeat(int robot);
@@ -231,6 +236,8 @@ class SimNode {
     std::vector<ros::Publisher> ros_robot_status_pub_;
     std::vector<ros::Publisher> ros_robot_damage_pub_;
     std::vector<ros::Publisher> ros_robot_heat_pub_;
+    std::vector<ros::Publisher> ros_robot_bonus_pub_;
+    std::vector<ros::Publisher> ros_robot_game_status_pub_;
 
     /**
      ******* ROS Service *******
@@ -283,6 +290,8 @@ class SimNode {
     std::vector<ros::Timer> barrel_heat_timer_;
     std::mutex mutex_;
 
+    // remain time
+    int remaining_time = 300;
 };
 
 
