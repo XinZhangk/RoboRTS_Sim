@@ -6,10 +6,11 @@
 #include <string>
 #include <cmath>
 #include <iostream>
-
 #include <thread>
 #include <mutex>
 //#include <Eigen/Dense>
+
+#include "sim_map.h"
 
 #include <geometry_msgs/PoseWithCovariance.h>
 #include <nav_msgs/Odometry.h>
@@ -74,10 +75,8 @@ struct RobotInfo {
     name(name),
     color(color),
     ammo(ammo),
-    hp(hp)
-  {
-    barrel_heat = 0;
-  };
+    hp(hp),
+    barrel_heat(0) {};
 
   // pose
   geometry_msgs::PoseWithCovariance pose;
@@ -95,111 +94,42 @@ struct RobotInfo {
   int barrel_heat;
 };
 
-// todo: move SimMap out of header file
-class SimMap {
-  public:
-    SimMap(){}
-    SimMap(nav_msgs::OccupancyGrid &map_msg):
-      map_msg_(map_msg)
-    {
-      this->origin_x_ = map_msg.info.origin.position.x;
-      this->origin_y_ = map_msg.info.origin.position.y;
-      this->scale_ = map_msg.info.resolution;
-      this->size_x_ = map_msg.info.width;
-      this->size_y_ = map_msg.info.height;
-      this->occ_cells_.resize(this->size_x_ * this->size_y_);
-
-      for (int i = 0; i < this->size_x_ * this->size_y_; i++) {
-    		auto tmp_msg = static_cast<int>(map_msg.data[i]);
-    		if (tmp_msg == 100) {
-    			this->occ_cells_[i] = true;
-    		} else {
-    			this->occ_cells_[i] = false;
-    		}
-      }
-    }
-
-    bool hasLineOfSight(double x1, double y1, double x2, double y2, std::vector<geometry_msgs::PoseStamped>& path) {
-      ROS_INFO("check line of sight between (%.4f, %.4f) and (%.4f, %.4f)", x1, y1, x2, y2);
-      double delta_x = x2 - x1;
-      double delta_y = y2 - y1;
-      int step_count = static_cast<int>(std::max(std::abs(delta_x) / this->scale_,
-        std::abs(delta_y)  / this->scale_));
-      double step_x = delta_x / step_count;
-      double step_y = delta_y / step_count;
-      for (int i = 0; i < step_count; i++) {
-        double pos_x = x1 + step_x * i;
-        double pos_y = y1 + step_y * i;
-        geometry_msgs::PoseStamped pose;
-        pose.header.frame_id = "map";
-        pose.pose.position.x = pos_x;
-        pose.pose.position.y = pos_y;
-        pose.pose.position.z = 0;
-        path.push_back(pose);
-
-        int index_x = static_cast<int>(pos_x/this->scale_);
-        int index_y = static_cast<int>(pos_y/this->scale_);
-        //ROS_INFO("check %d, %d", index_x, index_y);
-        // todo: should also have checked if there is another robot in the way, in which case the
-        // robot in between of the attacker and the target should be shot.
-        if (occ_cells_[index_x+index_y*this->size_x_]) {
-          return false;
-        }
-      }
-      return true;
-    }
-  private:
-    nav_msgs::OccupancyGrid map_msg_;
-    double origin_x_ = 0, origin_y_ = 0;
-    /**
-      * @brief Map scale (m/cell)
-      */
-    double scale_ = 0;
-    /**
-     * @brief Map dimensions (number of cells)
-     */
-    int size_x_ = 0, size_y_ = 0;
-    std::vector<bool> occ_cells_;
-};
-
-
 class SimNode {
   public:
     SimNode(std::string name);
 
   private:
+    // Initialization Relevant Methods
     bool Init();
     bool GetStaticMap();
     //void StartSim();
 
     void InitializeRobotInfo();
-    void PoseCallback(const nav_msgs::Odometry::ConstPtr &pose_msg, const int robot_index);
-    // todo to be added after gimbal simulation is added to gazebo
-    void GimbalAngleCtrlCallback(const roborts_msgs::GimbalAngle::ConstPtr &msg);
-    bool SetGimbalModeService(roborts_msgs::GimbalMode::Request &req,
-                                  roborts_msgs::GimbalMode::Response &res);
-    bool CtrlFricWheelService(roborts_msgs::FricWhl::Request &req,
-                                  roborts_msgs::FricWhl::Response &res);
-    bool CtrlShootService(roborts_msgs::ShootCmd::Request &req,
-                              roborts_msgs::ShootCmd::Response &res);
-    void PublishPath(const std::vector<geometry_msgs::PoseStamped> &path);
-    bool TryShoot(int robot1, int robot2);
-    bool TryReload(int robot);
 
-    bool ShootCmd(roborts_msgs::ShootCmdSim::Request &req,
-                  roborts_msgs::ShootCmdSim::Response &res);
-    bool ReloadCmd(roborts_sim::ReloadCmd::Request &req,
-                  roborts_sim::ReloadCmd::Response &res,
-                  int robot);
-
-    void AmmoDown(int robot, int num);
-    void HpDown(int robot, int damage, int damage_type);
-    bool CheckBullet(roborts_sim::CheckBullet::Request &req,roborts_sim::CheckBullet::Response &res);
-
+    // Game information Update Methods
     void CountDown();
     void GameCountDown();
     void resetReload(const ros::TimerEvent&);
     void gameEnd(const ros::TimerEvent&, int i);
+    void AmmoDown(int robot, int num);
+    void HpDown(int robot, int damage, int damage_type);
+
+    // Shooting Service Methods
+    bool ShootCmd(roborts_msgs::ShootCmdSim::Request &req, roborts_msgs::ShootCmdSim::Response &res);
+    bool TryShoot(int robot1, int robot2);
+
+    // Overheating rule functions
+    void AddBarrelHeat(int robot);
+    void PublishRobotHeat(int robot);
+    void SettleRobotHeat(int robot);
+    int ComputeBarrelDamage(int robot);
+
+    // Reloading Service Methods
+    bool ReloadCmd(roborts_sim::ReloadCmd::Request &req, roborts_sim::ReloadCmd::Response &res, int robot);
+    bool TryReload(int robot);
+
+    // Check bullet service methods
+    bool CheckBullet(roborts_sim::CheckBullet::Request &req,roborts_sim::CheckBullet::Response &res);
 
     // Robot Status Publisher
     void StartThread();
@@ -208,15 +138,23 @@ class SimNode {
     void PublishRobotStatus(int robot);
     void PublishGameStatus(int robot);
 
-    // shooting relevant
-    void AddBarrelHeat(int robot);
-    void PublishRobotHeat(int robot);
-    void SettleRobotHeat(int robot);
-    int ComputeBarrelDamage(int robot);
+    // Uncategorized
+    bool SetGimbalModeService(roborts_msgs::GimbalMode::Request &req,
+                              roborts_msgs::GimbalMode::Response &res);
+    bool CtrlFricWheelService(roborts_msgs::FricWhl::Request &req,
+                              roborts_msgs::FricWhl::Response &res);
+    bool CtrlShootService(roborts_msgs::ShootCmd::Request &req,
+                          roborts_msgs::ShootCmd::Response &res);
+
+    void PoseCallback(const nav_msgs::Odometry::ConstPtr &pose_msg, const int robot_index);
+    // todo to be added after gimbal simulation is added to gazebo
+    void GimbalAngleCtrlCallback(const roborts_msgs::GimbalAngle::ConstPtr &msg);
+
+    void PublishPath(const std::vector<geometry_msgs::PoseStamped> &path);
+
   private:
     //ROS Node handle
     ros::NodeHandle nh_;
-
 
     /**
      ******* ROS Subscriber *******
@@ -251,7 +189,6 @@ class SimNode {
     // ros service server for gimbal shoot control
     std::vector<ros::ServiceServer> ros_ctrl_shoot_srv_;
 
-
     ros::ServiceServer shoot_srv_;
     ros::ServiceServer check_bullet_srv_;
     //reload srv
@@ -262,6 +199,8 @@ class SimNode {
      */
     bool first_map_received_ = false;
     bool is_showing_los_ = false;
+    // remain time
+    int remaining_time = 300;
 
     /**
      ******* Data *******
@@ -290,8 +229,6 @@ class SimNode {
     std::vector<ros::Timer> barrel_heat_timer_;
     std::mutex mutex_;
 
-    // remain time
-    int remaining_time = 300;
 };
 
 

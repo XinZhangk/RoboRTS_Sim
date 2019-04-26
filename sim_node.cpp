@@ -230,7 +230,7 @@ void SimNode::SettleRobotHeat(int robot) {
 
 int SimNode::ComputeBarrelDamage(int barrel_heat) {
   if (barrel_heat >= 720) {
-    return (barrel_heat - BARREL_HEAT_UPPERBOUND) * 40;ROS_WARN
+    return (barrel_heat - BARREL_HEAT_UPPERBOUND) * 40;
   } else if (barrel_heat > 360) {
     return (barrel_heat - BARREL_HEAT_LIMIT) * 4;
   } else {
