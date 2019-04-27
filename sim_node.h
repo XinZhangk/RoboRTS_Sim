@@ -39,6 +39,7 @@
 #include "roborts_msgs/RobotBonus.h"
 #include "roborts_msgs/SupplierStatus.h"
 #include "roborts_msgs/GameStatus.h"
+#include "roborts_msgs/GameSurvivor.h";
 
 #define THREAD_NUM 8 // ROS SPIN THREAD NUM
 namespace roborts_sim {
@@ -207,6 +208,7 @@ class SimNode {
     void ExecuteLoop(int robot);
     void PublishRobotStatus(int robot);
     void PublishGameStatus(int robot);
+    void PublishGameSurvivor();
 
     // shooting relevant
     void AddBarrelHeat(int robot);
@@ -238,6 +240,7 @@ class SimNode {
     std::vector<ros::Publisher> ros_robot_heat_pub_;
     std::vector<ros::Publisher> ros_robot_bonus_pub_;
     std::vector<ros::Publisher> ros_robot_game_status_pub_;
+    std::vector<ros::Publisher> ros_robot_game_survivor_pub_;
 
     /**
      ******* ROS Service *******

@@ -31,6 +31,7 @@ bool SimNode::Init() {
     std::string reload_name               = "/" + robot_info_[i].name + "/" + "reload";
     std::string bonus_topic               = "/" + robot_info_[i].name + "/" + "bonus";
     std::string game_status_topic         = "/" + robot_info_[i].name + "/" + "game_status";
+    std::string game_survivor_topic       = "/" + robot_info_[i].name + "/" + "game_survivor";
     // fill up the vectors
     gazebo_real_pose_sub_.push_back(nh_.subscribe<nav_msgs::Odometry>(pose_topic, 100, boost::bind(&SimNode::PoseCallback,this,_1,i)));
     ros_gimbal_angle_sub_.push_back(nh_.subscribe(gimbal_angle_topic, 1, &SimNode::GimbalAngleCtrlCallback, this));
@@ -43,6 +44,7 @@ bool SimNode::Init() {
     ros_robot_heat_pub_.push_back(nh_.advertise<roborts_msgs::RobotHeat>(robot_heat_topic_name, 30));
     ros_robot_bonus_pub_.push_back(nh_.advertise<roborts_msgs::RobotBonus>(bonus_topic,30));
     ros_robot_game_status_pub_.push_back(nh_.advertise<roborts_msgs::GameStatus>(game_status_topic, 30));
+    ros_robot_game_survivor_pub_.push_back(nh_.advertise<roborts_msgs::GameSurvivor>(game_survivor_topic, 30));
     // fill up reload vector
     reload_srv_.push_back(nh_.advertiseService<roborts_sim::ReloadCmd::Request, roborts_sim::ReloadCmd::Response>(reload_name, boost::bind(&SimNode::ReloadCmd,  this, _1, _2, i+1)));
   }
@@ -162,6 +164,17 @@ void SimNode::PublishRobotHeat(int robot) {
   ros_robot_heat_pub_[robot-1].publish(robot_heat);
 }
 
+void SimNode::PublishGameSurvivor(){
+  roborts_msgs::GameSurvivor gs;
+  (robot_info_[0].hp == 0) ? gs.red3 = false : gs.red3 = true;
+  (robot_info_[1].hp == 0) ? gs.red4 = false : gs.red4 = true;
+  (robot_info_[2].hp == 0) ? gs.blue3 = false : gs.blue3 = true;
+  (robot_info_[3].hp == 0) ? gs.blue4 = false : gs.blue4 = true;
+  for(int i = 0; i < ROBOT_NUM; i++){
+    ros_robot_game_survivor_pub_[i].publish(gs);
+  }
+}
+
 bool SimNode::GetStaticMap(){
   ros_static_map_srv_ = nh_.serviceClient<nav_msgs::GetMap>("/static_map");
   ros::service::waitForService("/static_map", -1);
@@ -230,7 +243,7 @@ void SimNode::SettleRobotHeat(int robot) {
 
 int SimNode::ComputeBarrelDamage(int barrel_heat) {
   if (barrel_heat >= 720) {
-    return (barrel_heat - BARREL_HEAT_UPPERBOUND) * 40;ROS_WARN
+    return (barrel_heat - BARREL_HEAT_UPPERBOUND) * 40;
   } else if (barrel_heat > 360) {
     return (barrel_heat - BARREL_HEAT_LIMIT) * 4;
   } else {
@@ -382,6 +395,7 @@ void SimNode::gameEnd(const ros::TimerEvent&, int i){
 void SimNode::GameCountDown(){
   ros::Rate r(1);
   while(ros::ok()){
+    PublishGameSurvivor();
     for(int i = 0; i < ROBOT_NUM; i++){
       PublishGameStatus(i);
     }
@@ -394,6 +408,7 @@ void SimNode::GameCountDown(){
     }
     r.sleep();
   }
+
 }
 } // roborts_sim
 
