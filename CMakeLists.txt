@@ -39,6 +39,7 @@ add_executable(
   sim_node
   sim_node.cpp 
   sim_node.h
+  sim_map.h
 )
 
 add_dependencies(sim_node
