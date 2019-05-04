@@ -20,6 +20,7 @@
 #include <geometry_msgs/PoseStamped.h>
 #include "roborts_msgs/ShootCmdSim.h"
 #include <ros/ros.h>
+#include <tf/tf.h>
 
 // TODO: Use another header file to include such a bunch of protocol head files
 #include "roborts_sim/CheckBullet.h"
@@ -40,8 +41,9 @@
 #include "roborts_msgs/RobotBonus.h"
 #include "roborts_msgs/SupplierStatus.h"
 #include "roborts_msgs/GameStatus.h"
-#include "roborts_msgs/GameSurvivor.h";
+#include "roborts_msgs/GameSurvivor.h"
 
+#define PI 3.1416
 #define THREAD_NUM 8 // ROS SPIN THREAD NUM
 namespace roborts_sim {
 
@@ -145,8 +147,11 @@ class SimNode {
                               roborts_msgs::GimbalMode::Response &res);
     bool CtrlFricWheelService(roborts_msgs::FricWhl::Request &req,
                               roborts_msgs::FricWhl::Response &res);
+
+    // updated version for shoot service
     bool CtrlShootService(roborts_msgs::ShootCmd::Request &req,
-                          roborts_msgs::ShootCmd::Response &res);
+                          roborts_msgs::ShootCmd::Response &res, const int robot_index);
+    double GetYaw(geometry_msgs::Quaternion orientation);
 
     void PoseCallback(const nav_msgs::Odometry::ConstPtr &pose_msg, const int robot_index);
     // todo to be added after gimbal simulation is added to gazebo

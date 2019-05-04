@@ -37,6 +37,11 @@ public:
 
   bool hasLineOfSight(double x1, double y1, double x2, double y2, std::vector <geometry_msgs::PoseStamped> &path) {
     ROS_INFO("check line of sight between (%.4f, %.4f) and (%.4f, %.4f)", x1, y1, x2, y2);
+    if (x1==x2 && x2==y2)
+    {
+      ROS_WARN("checking same location");
+      return false;
+    }
     double delta_x = x2 - x1;
     double delta_y = y2 - y1;
     int step_count = static_cast<int>(std::max(std::abs(delta_x) / this->scale_,

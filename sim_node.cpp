@@ -37,7 +37,10 @@ bool SimNode::Init() {
     ros_gimbal_angle_sub_.push_back(nh_.subscribe(gimbal_angle_topic, 1, &SimNode::GimbalAngleCtrlCallback, this));
     ros_gimbal_mode_srv_.push_back(nh_.advertiseService(gimbal_mode_service_name, &SimNode::SetGimbalModeService, this));
     ros_ctrl_fric_wheel_srv_.push_back(nh_.advertiseService(fric_wheel_service_name, &SimNode::CtrlFricWheelService, this));
-    ros_ctrl_shoot_srv_.push_back(nh_.advertiseService(gimbal_shoot_service_name, &SimNode::CtrlShootService, this));
+    //ros_ctrl_shoot_srv_.push_back(nh_.advertiseService(gimbal_shoot_service_name, &SimNode::CtrlShootService, this));
+    ros_ctrl_shoot_srv_.push_back(nh_.advertiseService<roborts_msgs::ShootCmd::Request,roborts_msgs::ShootCmd::Response>(gimbal_shoot_service_name, boost::bind(&SimNode::CtrlShootService,  this, _1, _2, i+1)));
+    
+    
     ros_countdown_pub_.push_back(nh_.advertise<roborts_sim::Countdown>(countdown_topic_name, 1000));
     ros_robot_status_pub_.push_back(nh_.advertise<roborts_msgs::RobotStatus>(robot_status_topic_name, 30));
     ros_robot_damage_pub_.push_back(nh_.advertise<roborts_msgs::RobotDamage>(robot_damage_topic_name, 30));
@@ -297,6 +300,8 @@ bool SimNode::TryShoot(int robot1, int robot2) {
   PublishPath(currentPath);
 }
 
+
+
 bool SimNode::TryReload(int robot){
   ROS_INFO("Robot %d tries reloading.", robot);
 
@@ -335,8 +340,161 @@ bool SimNode::CtrlFricWheelService(roborts_msgs::FricWhl::Request &req,
                                   }
 
 bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
-                              roborts_msgs::ShootCmd::Response &res){
-  return false;
+                              roborts_msgs::ShootCmd::Response &res,
+                              const int robot_index){
+  std::vector<geometry_msgs::PoseStamped> currentPath;
+  // the offset between robot armor and its base link
+  double fb_offset = 0.25;
+  double lr_offset = 0.15;
+  double armor_width = 0.07;
+  RobotInfo robot = robot_info_[robot_index-1];
+                             
+  for(auto target:robot_info_)
+  {
+    if (target.name!=robot.name)
+    {
+      auto r1_pos = robot.pose.pose.position;
+      auto r2_pos = target.pose.pose.position;
+      if (map_.hasLineOfSight(r1_pos.x, r1_pos.y, r2_pos.x, r2_pos.y, currentPath))
+      {
+        std::string id_str = target.name;
+        id_str.erase(0,1);
+        int robot_id = std::stoi(id_str);
+
+        double r1_yaw = GetYaw(robot.pose.pose.orientation);
+        double r2_yaw = GetYaw(target.pose.pose.orientation);
+        double pi = PI;
+
+        r2_yaw = r2_yaw + PI;
+        if (r2_yaw > PI) r2_yaw=r2_yaw-2*PI;
+
+        //front 
+        double r2_f_x = r2_pos.x+cos(r2_yaw)*fb_offset;
+        double r2_f_y = r2_pos.y+sin(r2_yaw)*fb_offset;
+        double dis_f = sqrt(pow(r2_f_x - r1_pos.x,2)+pow(r2_f_y - r1_pos.y,2));
+
+        //left
+        double r2_yaw_l = r2_yaw + 90/180.0*pi;
+
+        if(r2_yaw_l>PI) r2_yaw_l = r2_yaw_l - 2 * PI;
+        double r2_l_x = r2_pos.x+cos(r2_yaw_l)*lr_offset;
+        double r2_l_y = r2_pos.y+sin(r2_yaw_l)*lr_offset;
+        double dis_l = sqrt(pow(r2_l_x - r1_pos.x,2)+pow(r2_l_y - r1_pos.y,2));
+        
+        //back
+        double r2_yaw_b = r2_yaw_l + 90/180.0*pi;
+        if(r2_yaw_b>PI) r2_yaw_b = r2_yaw_b - 2 * PI;
+        double r2_b_x = r2_pos.x+cos(r2_yaw_b)*fb_offset;
+        double r2_b_y = r2_pos.y+sin(r2_yaw_b)*fb_offset;
+        double dis_b = sqrt(pow(r2_b_x - r1_pos.x,2)+pow(r2_b_y - r1_pos.y,2));
+
+        //right 
+        double r2_yaw_r = r2_yaw_b + 90/180.0*pi;
+        if(r2_yaw_r>PI) r2_yaw_r = r2_yaw_r - 2 * PI;        
+        double r2_r_x = r2_pos.x+cos(r2_yaw_r)*lr_offset;
+        double r2_r_y = r2_pos.y+sin(r2_yaw_r)*lr_offset;
+        double dis_r = sqrt(pow(r2_r_x - r1_pos.x,2)+pow(r2_r_y - r1_pos.y,2));
+        ROS_WARN("The ywa: f: %f, l: %f, b: %f, r: %f",r2_yaw,r2_yaw_l,r2_yaw_b,r2_yaw_r);
+
+
+        double i_x,i_y;
+        if (dis_f < dis_l && dis_f < dis_b && dis_f < dis_r)
+        {
+          i_x = (tan(r1_yaw)*r1_pos.x-tan(r2_yaw_l)*r2_f_x+r2_f_y-r1_pos.y)/(tan(r1_yaw)-tan(r2_yaw_l));
+          i_y = tan(r1_yaw)*(i_x-r1_pos.x)+r1_pos.y;
+          if (sqrt(pow(r2_f_x - i_x,2)+pow(r2_f_y - i_y,2))<armor_width)
+          {
+            ROS_INFO("Valid hit, damage detected on %s front armor",target.name.c_str());
+            ROS_WARN("current yaw for target is %.5f",r2_yaw);
+            roborts_msgs::RobotDamage dmg_msg;
+            dmg_msg.damage_type = 0;
+            dmg_msg.damage_source = 0;
+            ros_robot_damage_pub_[robot_id-1].publish(dmg_msg);
+          }
+          else
+          {
+            ROS_INFO("%s trying to shoot front armor, but missed!", robot.name.c_str());
+            ROS_WARN("current yaw for target is %.5f",r2_yaw);
+          }
+          
+        }
+        else if (dis_l < dis_f &&dis_l < dis_b &&dis_l < dis_r)
+        {
+          i_x = (tan(r1_yaw)*r1_pos.x-tan(r2_yaw)*r2_l_x+r2_l_y-r1_pos.y)/(tan(r1_yaw)-tan(r2_yaw));
+          i_y = tan(r1_yaw)*(i_x-r1_pos.x)+r1_pos.y;
+          if (sqrt(pow(r2_l_x - i_x,2)+pow(r2_l_y - i_y,2))<armor_width)
+          {
+            ROS_INFO("Valid hit, damage detected on %s left armor",target.name.c_str());
+            ROS_WARN("current yaw for target is %.5f",r2_yaw_l);
+            roborts_msgs::RobotDamage dmg_msg;
+            dmg_msg.damage_type = 0;
+            dmg_msg.damage_source = 1;
+            ros_robot_damage_pub_[robot_id-1].publish(dmg_msg);
+          }
+          else
+          {
+            ROS_INFO("%s trying to shoot left armor, but missed! dis is: %f", robot.name.c_str(),sqrt(pow(r2_r_x - i_x,2)+pow(r2_r_y - i_y,2)));
+            ROS_WARN("current yaw for target is %.5f",r2_yaw_l);
+          }
+        }
+        else if (dis_b < dis_l &&dis_b < dis_f &&dis_b < dis_r)
+        {
+          i_x = (tan(r1_yaw)*r1_pos.x-tan(r2_yaw_l)*r2_b_x+r2_b_y-r1_pos.y)/(tan(r1_yaw)-tan(r2_yaw_l));
+          i_y = tan(r1_yaw)*(i_x-r1_pos.x)+r1_pos.y;
+          if (sqrt(pow(r2_b_x - i_x,2)+pow(r2_b_y - i_y,2))<armor_width)
+          {
+            ROS_INFO("Valid hit, damage detected on %s back armor",target.name.c_str());
+            ROS_WARN("current yaw for target is %.5f",r2_yaw_b);
+            roborts_msgs::RobotDamage dmg_msg;
+            dmg_msg.damage_type = 0;
+            dmg_msg.damage_source = 2;
+            ros_robot_damage_pub_[robot_id-1].publish(dmg_msg);
+          }
+          else
+          {
+            ROS_INFO("%s trying to shoot back armor, but missed!", robot.name.c_str());
+            ROS_WARN("current yaw for target is %.5f",r2_yaw_b);
+          }
+        }
+        else if (dis_r < dis_l &&dis_r < dis_b &&dis_r < dis_f)
+        {
+          i_x = (tan(r1_yaw)*r1_pos.x-tan(r2_yaw)*r2_r_x+r2_r_y-r1_pos.y)/(tan(r1_yaw)-tan(r2_yaw));
+          i_y = tan(r1_yaw)*(i_x-r1_pos.x)+r1_pos.y;
+          if (sqrt(pow(r2_r_x - i_x,2)+pow(r2_r_y - i_y,2))<armor_width)
+          {
+            ROS_INFO("Valid hit, damage detected on %s right armor",target.name.c_str());
+            ROS_WARN("current yaw for target is %.5f",r2_yaw_r);
+            roborts_msgs::RobotDamage dmg_msg;
+            dmg_msg.damage_type = 0;
+            dmg_msg.damage_source = 3;
+            ros_robot_damage_pub_[robot_id-1].publish(dmg_msg);
+          }
+          else
+          {
+            ROS_INFO("%s trying to shoot right armor, but missed!", robot.name.c_str());
+            ROS_WARN("current yaw for target is %.5f",r2_yaw_r);
+          }
+        }
+        else
+        {
+          ROS_WARN("The distances: f: %f, l: %f, b: %f, r: %f",r2_yaw,r2_yaw_l,r2_yaw_b,r2_yaw_r);
+        }
+        
+        // check the side armor
+      }
+    }
+  }
+  
+  //ROS_WARN("Robot :%d trying to shoot",robot);
+  return true;
+}
+
+double SimNode::GetYaw(geometry_msgs::Quaternion orientation)
+{
+  tf::Quaternion q(orientation.x,orientation.y,orientation.z,orientation.w);
+  tf::Matrix3x3 m(q);
+  double roll, pitch, yaw;
+  m.getRPY(roll, pitch, yaw);
 }
 
 bool SimNode::ShootCmd(roborts_msgs::ShootCmdSim::Request &req,
