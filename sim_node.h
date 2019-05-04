@@ -110,7 +110,7 @@ class SimNode {
     // Game information Update Methods
     void CountDown();
     void GameCountDown();
-    void resetReload(const ros::TimerEvent&);
+    void resetReload();
     void gameEnd(const ros::TimerEvent&, int i);
     void AmmoDown(int robot, int num);
     void HpDown(int robot, int damage, int damage_type);
@@ -203,7 +203,7 @@ class SimNode {
     bool first_map_received_ = false;
     bool is_showing_los_ = false;
     // remain time
-    int remaining_time = 300;
+    int remaining_time = 305;
 
     /**
      ******* Data *******
