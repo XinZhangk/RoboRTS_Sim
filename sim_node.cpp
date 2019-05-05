@@ -7,6 +7,13 @@ SimNode::SimNode(std::string name) {
   ROS_INFO("Simulation node initialized");
   //StartSim();
 
+  std::thread game_thread(&SimNode::GameCountDown, this);
+  game_thread.detach();
+
+  std::thread status_thread(&SimNode::ExecutePublishLoop, this);
+  status_thread.detach();
+
+
 }
 
 bool SimNode::Init() {
@@ -75,11 +82,6 @@ bool SimNode::Init() {
 
   //CountDown();
 
-  std::thread game_thread(&SimNode::GameCountDown, this);
-  game_thread.detach();
-  
-  //StartThread();
-
   return true;
 }
 
@@ -98,6 +100,28 @@ void SimNode::InitializeRobotInfo(){
   }
 }
 
+bool SimNode::GetStaticMap(){
+  ros_static_map_srv_ = nh_.serviceClient<nav_msgs::GetMap>("/static_map");
+  ros::service::waitForService("/static_map", -1);
+  nav_msgs::GetMap::Request req;
+  nav_msgs::GetMap::Response res;
+  if(ros_static_map_srv_.call(req,res)) {
+    ROS_INFO("Received Static Map");
+    map_ = SimMap(res.map);
+    first_map_received_ = true;
+    return true;
+  } else{
+    ROS_ERROR("Get static map failed");
+    return false;
+  }
+}
+
+void SimNode::PublishPath(const std::vector<geometry_msgs::PoseStamped> &path) {
+  path_.poses = path;
+  path_.header.frame_id = "map";
+  path_pub_.publish(path_);
+}
+
 // Check Bullet Service
 // I think the caller of this service should be the robot, in our simulation.
 // The rationale is that the whole weaponry system is controlled by the simulation node, virtually.
@@ -110,48 +134,62 @@ bool SimNode::CheckBullet(roborts_sim::CheckBullet::Request &req,roborts_sim::Ch
   return true;
 }
 
-void SimNode::StartThread() {
-  for(unsigned i = 0; i < ROBOT_NUM; i++) {
-    robot_medium_thread_.push_back(std::thread(&SimNode::ExecuteLoop, this, i));
-  }
-}
-
-void SimNode::StopThread() {
-  for(unsigned i = 0; i < ROBOT_NUM; i++) {
-    if (robot_medium_thread_[i].joinable()) {
-      robot_medium_thread_[i].join();
-    }
-  }
-}
-
-void SimNode::ExecuteLoop(int robot) {
+void SimNode::ExecutePublishLoop() {
   ros::Rate r(10);
-  while (ros::ok()) {
-    PublishRobotStatus(robot);
-    PublishRobotHeat(robot);
-    SettleRobotHeat(robot);
-    
+  while(ros::ok()) {
+    for(unsigned id = 1; id <= ROBOT_NUM; id++) {
+      PublishRobotStatus(id);
+      PublishRobotHeat(id);
+      SettleRobotHeat(id);
+    }
     ros::spinOnce();
     r.sleep();
   }
 }
 
+//void SimNode::StartThread() {
+//  for(unsigned i = 0; i < ROBOT_NUM; i++) {
+//    robot_medium_thread_.push_back(std::thread(&SimNode::ExecuteLoop, this, i));
+//  }
+//}
+//
+//void SimNode::StopThread() {
+//  for(unsigned i = 0; i < ROBOT_NUM; i++) {
+//    if (robot_medium_thread_[i].joinable()) {
+//      robot_medium_thread_[i].join();
+//    }
+//  }
+//}
+//
+//void SimNode::ExecuteLoop(int robot) {
+//  ros::Rate r(10);
+//  while (ros::ok()) {
+//    ROS_INFO("Robot %d %s", robot, __FUNCTION__);
+//    PublishRobotStatus(robot);
+//    PublishRobotHeat(robot);
+//    SettleRobotHeat(robot);
+//
+//    ros::spinOnce();
+//    r.sleep();
+//  }
+//}
+
 void SimNode::PublishRobotStatus(int robot) {
   roborts_msgs::RobotStatus robot_status;
   // transform literal robot name to numeric id
-  if (robot == 0) {
+  if (robot == 1) {
     robot_status.id = 1;
     robot_status.remain_hp = robot_info_[0].hp;
     ros_robot_status_pub_[0].publish(robot_status);
-  } else if (robot == 1) {
+  } else if (robot == 2) {
     robot_status.id = 2;
     robot_status.remain_hp = robot_info_[1].hp;
     ros_robot_status_pub_[1].publish(robot_status);
-  } else if (robot == 2) {
+  } else if (robot == 3) {
     robot_status.id = 13;
     robot_status.remain_hp = robot_info_[2].hp;
     ros_robot_status_pub_[2].publish(robot_status);
-  } else if (robot == 3) {
+  } else if (robot == 4) {
     robot_status.id = 14;
     robot_status.remain_hp = robot_info_[3].hp;
     ros_robot_status_pub_[3].publish(robot_status);
@@ -178,32 +216,10 @@ void SimNode::PublishGameSurvivor(){
   }
 }
 
-bool SimNode::GetStaticMap(){
-  ros_static_map_srv_ = nh_.serviceClient<nav_msgs::GetMap>("/static_map");
-  ros::service::waitForService("/static_map", -1);
-  nav_msgs::GetMap::Request req;
-  nav_msgs::GetMap::Response res;
-  if(ros_static_map_srv_.call(req,res)) {
-    ROS_INFO("Received Static Map");
-    map_ = SimMap(res.map);
-    first_map_received_ = true;
-    return true;
-  } else{
-    ROS_ERROR("Get static map failed");
-    return false;
-  }
-}
-
-void SimNode::PublishPath(const std::vector<geometry_msgs::PoseStamped> &path) {
-  path_.poses = path;
-  path_.header.frame_id = "map";
-  path_pub_.publish(path_);
-}
-
 void SimNode::PublishGameStatus(int robot){
   roborts_msgs::GameStatus gsmsg;
   gsmsg.remaining_time = remaining_time;
-  ros_robot_game_status_pub_[robot].publish(gsmsg);
+  ros_robot_game_status_pub_[robot-1].publish(gsmsg);
 }
 
 void SimNode::AmmoDown(int robot, int num) {
@@ -230,18 +246,23 @@ void SimNode::AddBarrelHeat(int robot) {
 }
 
 void SimNode::SettleRobotHeat(int robot) {
-  std::lock_guard <std::mutex> guard(mutex_);
-  int barrel_heat = robot_info_[robot-1].barrel_heat;
-  int robot_hp = robot_info_[robot-1].hp;
-  if (barrel_heat > 720) {
-    ROS_WARN("There must be a synchronization problem.");
+  int barrel_heat;
+  {
+    std::lock_guard <std::mutex> guard(mutex_);
+    barrel_heat = robot_info_[robot - 1].barrel_heat;
+    int robot_hp = robot_info_[robot - 1].hp;
+    if (barrel_heat > 720) {
+      ROS_WARN("There must be a synchronization problem.");
+    }
+    if (robot_hp >= 400) {
+      robot_info_[robot - 1].barrel_heat = std::max(robot_info_[robot - 1].barrel_heat - static_cast<int>(BARREL_COOLING_RATE / 2), 0);
+    } else {
+      robot_info_[robot - 1].barrel_heat = std::max(robot_info_[robot - 1].barrel_heat - BARREL_COOLING_RATE, 0);
+    }
   }
-  if (robot_hp >= 400) {
-    robot_info_[robot-1].barrel_heat -= static_cast<int>(BARREL_COOLING_RATE / 2);
-  } else {
-    robot_info_[robot-1].barrel_heat -= BARREL_COOLING_RATE;
+  if (barrel_heat > 360) {
+    HpDown(robot, ComputeBarrelDamage(barrel_heat), 2);
   }
-  HpDown(robot, ComputeBarrelDamage(barrel_heat), 2);
 }
 
 int SimNode::ComputeBarrelDamage(int barrel_heat) {
@@ -254,17 +275,21 @@ int SimNode::ComputeBarrelDamage(int barrel_heat) {
   }
 }
 
-void SimNode::HpDown(int robot, int damage, int damage_type){
+void SimNode::HpDown(int robot, int damage, int damage_type, int damage_source) {
+  if (robot_info_[robot-1].hp <= 0) {
+    ROS_WARN("Actually Robot %d has been dead but still received damage", robot);
+  }
+
   {
     std::lock_guard <std::mutex> guard(mutex_);
     robot_info_[robot-1].hp -= damage;
   }
-  ROS_INFO("Robot %d lost %d hit points", robot, damage);
   roborts_msgs::RobotDamage robot_damage;
   robot_damage.damage_type = damage_type;
-  ros_robot_status_pub_[robot-1].publish(robot_damage);
-  if (robot_info_[robot-1].hp < 0)
-  {
+  robot_damage.damage_source = damage_source;
+  ros_robot_damage_pub_[robot-1].publish(robot_damage);
+  if (robot_info_[robot-1].hp < 0) {
+    robot_info_[robot-1].hp = 0;
     roborts_sim::Countdown cdm;
     cdm.gameState = "Countdown ends!";
     ROS_INFO("robot %d is dead", robot);
@@ -333,6 +358,11 @@ bool SimNode::CtrlFricWheelService(roborts_msgs::FricWhl::Request &req,
 bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
                               roborts_msgs::ShootCmd::Response &res,
                               const int robot_index){
+  if (robot_info_[robot_index-1].ammo <= 0) {
+    ROS_WARN("Robot %d has no ammo but tries to shoot.", robot_index);
+    return false;
+  }
+
   std::vector<geometry_msgs::PoseStamped> currentPath;
   // the offset between robot armor and its base link
   double fb_offset = 0.25;
@@ -397,10 +427,8 @@ bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
           {
             ROS_INFO("Valid hit, damage detected on %s front armor",target.name.c_str());
             ROS_WARN("current yaw for target is %.5f",r2_yaw);
-            roborts_msgs::RobotDamage dmg_msg;
-            dmg_msg.damage_type = 0;
-            dmg_msg.damage_source = 0;
-            ros_robot_damage_pub_[robot_id-1].publish(dmg_msg);
+            AmmoDown(robot_index, 1);
+            HpDown(robot_id, DAMAGE_PER_BULLET, 0, 0);
           }
           else
           {
@@ -417,10 +445,12 @@ bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
           {
             ROS_INFO("Valid hit, damage detected on %s left armor",target.name.c_str());
             ROS_WARN("current yaw for target is %.5f",r2_yaw_l);
-            roborts_msgs::RobotDamage dmg_msg;
-            dmg_msg.damage_type = 0;
-            dmg_msg.damage_source = 1;
-            ros_robot_damage_pub_[robot_id-1].publish(dmg_msg);
+            AmmoDown(robot_index, 1);
+            HpDown(robot_id, DAMAGE_PER_BULLET, 0, 1);
+//            roborts_msgs::RobotDamage dmg_msg;
+//            dmg_msg.damage_type = 0;
+//            dmg_msg.damage_source = 1;
+//            ros_robot_damage_pub_[robot_id-1].publish(dmg_msg);
           }
           else
           {
@@ -436,10 +466,12 @@ bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
           {
             ROS_INFO("Valid hit, damage detected on %s back armor",target.name.c_str());
             ROS_WARN("current yaw for target is %.5f",r2_yaw_b);
-            roborts_msgs::RobotDamage dmg_msg;
-            dmg_msg.damage_type = 0;
-            dmg_msg.damage_source = 2;
-            ros_robot_damage_pub_[robot_id-1].publish(dmg_msg);
+            AmmoDown(robot_index, 1);
+            HpDown(robot_id, DAMAGE_PER_BULLET, 0, 2);
+//            roborts_msgs::RobotDamage dmg_msg;
+//            dmg_msg.damage_type = 0;
+//            dmg_msg.damage_source = 2;
+//            ros_robot_damage_pub_[robot_id-1].publish(dmg_msg);
           }
           else
           {
@@ -455,10 +487,12 @@ bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
           {
             ROS_INFO("Valid hit, damage detected on %s right armor",target.name.c_str());
             ROS_WARN("current yaw for target is %.5f",r2_yaw_r);
-            roborts_msgs::RobotDamage dmg_msg;
-            dmg_msg.damage_type = 0;
-            dmg_msg.damage_source = 3;
-            ros_robot_damage_pub_[robot_id-1].publish(dmg_msg);
+            AmmoDown(robot_index, 1);
+            HpDown(robot_id, DAMAGE_PER_BULLET, 0, 3);
+//            roborts_msgs::RobotDamage dmg_msg;
+//            dmg_msg.damage_type = 0;
+//            dmg_msg.damage_source = 3;
+//            ros_robot_damage_pub_[robot_id-1].publish(dmg_msg);
           }
           else
           {
@@ -554,12 +588,12 @@ void SimNode::GameCountDown(){
   ros::Rate r(1);
   while(ros::ok()){
     PublishGameSurvivor();
-    for(int i = 0; i < ROBOT_NUM; i++){
+    for(int i = 1; i <= ROBOT_NUM; i++){
       PublishGameStatus(i);
     }
     remaining_time--;
     if(remaining_time == 0){
-      for(int i = 0; i < ROBOT_NUM; i++){
+      for(int i = 1; i <= ROBOT_NUM; i++){
         PublishGameStatus(i);
       }
       return;

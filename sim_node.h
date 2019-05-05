@@ -8,6 +8,7 @@
 #include <iostream>
 #include <thread>
 #include <mutex>
+#include <algorithm>
 //#include <Eigen/Dense>
 
 #include "sim_map.h"
@@ -25,7 +26,6 @@
 // TODO: Use another header file to include such a bunch of protocol head files
 #include "roborts_sim/CheckBullet.h"
 #include "roborts_sim/ReloadCmd.h"
-#include "roborts_sim/ShootCmd.h"
 #include "roborts_sim/Countdown.h"
 
 #include "roborts_msgs/GimbalAngle.h"
@@ -115,7 +115,7 @@ class SimNode {
     void resetReload(const ros::TimerEvent&);
     void gameEnd(const ros::TimerEvent&, int i);
     void AmmoDown(int robot, int num);
-    void HpDown(int robot, int damage, int damage_type);
+    void HpDown(int robot, int damage, int damage_type, int damage_source = 0);
 
     // Shooting Service Methods
     bool ShootCmd(roborts_msgs::ShootCmdSim::Request &req, roborts_msgs::ShootCmdSim::Response &res);
@@ -135,9 +135,10 @@ class SimNode {
     bool CheckBullet(roborts_sim::CheckBullet::Request &req,roborts_sim::CheckBullet::Response &res);
 
     // Robot Status Publisher
-    void StartThread();
-    void StopThread();
-    void ExecuteLoop(int robot);
+    void ExecutePublishLoop();
+//    void StartThread();
+//    void StopThread();
+//    void ExecuteLoop(int robot);
     void PublishRobotStatus(int robot);
     void PublishGameStatus(int robot);
     void PublishGameSurvivor();
