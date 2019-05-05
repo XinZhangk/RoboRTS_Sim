@@ -218,8 +218,17 @@ void SimNode::PublishGameSurvivor(){
 
 void SimNode::PublishGameStatus(int robot){
   roborts_msgs::GameStatus gsmsg;
-  gsmsg.remaining_time = remaining_time;
-  ros_robot_game_status_pub_[robot-1].publish(gsmsg);
+  if(remaining_time > 300){
+    gsmsg.game_status = 3;
+    gsmsg.remaining_time = remaining_time;
+    if(robot == 1){
+      ROS_INFO("Game starts in %d second(s).", remaining_time - 300);
+    }
+  }else{
+    gsmsg.game_status = 4;
+    gsmsg.remaining_time = remaining_time;
+  }
+  ros_robot_game_status_pub_[robot].publish(gsmsg);
 }
 
 void SimNode::AmmoDown(int robot, int num) {
@@ -541,7 +550,7 @@ bool SimNode::ReloadCmd(roborts_sim::ReloadCmd::Request &req,
   return true;
 }
 
-void SimNode::CountDown(){
+/*void SimNode::CountDown(){
   roborts_sim::Countdown cdm;
   cdm.gameState = "Game starts!";
   ROS_INFO("Game starts!");
@@ -568,25 +577,28 @@ void SimNode::CountDown(){
   }
   reload_timer_ = nh_.createTimer(ros::Duration(60), &SimNode::resetReload, this);
   ros::spinOnce();
-}
+}*/
 
-void SimNode::resetReload(const ros::TimerEvent&){
+void SimNode::resetReload(){
   for(int i = 0; i < robot_info_.size(); i++){
     robot_info_[i].reload_time = 0;
   }
-  ROS_INFO("Resetting reload");
+  ROS_INFO("Reload times reseted");
 }
 
-void SimNode::gameEnd(const ros::TimerEvent&, int i){
+/*void SimNode::gameEnd(const ros::TimerEvent&, int i){
   roborts_sim::Countdown cdm;
   cdm.gameState = "Countdown ends!";
   ROS_INFO("Countdown ends!");
   ros_countdown_pub_[i].publish(cdm);
-}
+}*/
 
 void SimNode::GameCountDown(){
   ros::Rate r(1);
   while(ros::ok()){
+    if(remaining_time % 60 == 0){
+      resetReload();
+    }
     PublishGameSurvivor();
     for(int i = 1; i <= ROBOT_NUM; i++){
       PublishGameStatus(i);
