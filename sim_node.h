@@ -9,6 +9,7 @@
 #include <thread>
 #include <mutex>
 #include <algorithm>
+#include <chrono>
 //#include <Eigen/Dense>
 
 #include "sim_map.h"
@@ -39,6 +40,7 @@
 #include "roborts_msgs/RobotDamage.h"
 #include "roborts_msgs/RobotHeat.h"
 #include "roborts_msgs/RobotBonus.h"
+#include "roborts_msgs/BonusStatus.h"
 #include "roborts_msgs/SupplierStatus.h"
 #include "roborts_msgs/GameStatus.h"
 #include "roborts_msgs/GameSurvivor.h"
@@ -79,7 +81,7 @@ struct RobotInfo {
     color(color),
     ammo(ammo),
     hp(hp),
-    barrel_heat(0) {};
+    barrel_heat(0){};
 
   // pose
   geometry_msgs::PoseWithCovariance pose;
@@ -95,6 +97,10 @@ struct RobotInfo {
   int reload_time;
   // barrel heat
   int barrel_heat;
+  //bonus
+  bool bonus = false;
+  //bonus time
+  int buff_time = 0;
 };
 
 class SimNode {
@@ -128,8 +134,16 @@ class SimNode {
     int ComputeBarrelDamage(int robot);
 
     // Reloading Service Methods
-    bool ReloadCmd(roborts_sim::ReloadCmd::Request &req, roborts_sim::ReloadCmd::Response &res, int robot);
+    //bool ReloadCmd(roborts_sim::ReloadCmd::Request &req, roborts_sim::ReloadCmd::Response &res, int robot);
     bool TryReload(int robot);
+    bool ReloadDetector(bool red);
+
+    //Buff Zone
+    bool BuffzoneDetector(bool red);
+    void TryRedBuff();
+    void TryBlueBuff();
+    void resetBufftime();
+    void resetBuff(bool red);
 
     // Check bullet service methods
     bool CheckBullet(roborts_sim::CheckBullet::Request &req,roborts_sim::CheckBullet::Response &res);
@@ -142,6 +156,8 @@ class SimNode {
     void PublishRobotStatus(int robot);
     void PublishGameStatus(int robot);
     void PublishGameSurvivor();
+    void PublishBonus(int robot);
+    void PublishBonusStatus(int robot);
 
     // Uncategorized
     bool SetGimbalModeService(roborts_msgs::GimbalMode::Request &req,
@@ -183,9 +199,10 @@ class SimNode {
     std::vector<ros::Publisher> ros_robot_damage_pub_;
     std::vector<ros::Publisher> ros_robot_heat_pub_;
     std::vector<ros::Publisher> ros_robot_bonus_pub_;
+    std::vector<ros::Publisher> ros_robot_bonus_status_pub_;
     std::vector<ros::Publisher> ros_robot_game_status_pub_;
     std::vector<ros::Publisher> ros_robot_game_survivor_pub_;
-
+    std::vector<ros::Publisher> ros_robot_supplier_status_pub_;
     /**
      ******* ROS Service *******
      */
@@ -210,7 +227,8 @@ class SimNode {
     bool is_showing_los_ = false;
     // remain time
     int remaining_time = 305;
-
+    int red_bonus_time = 0;
+    int blue_bonus_time = 0;
     /**
      ******* Data *******
      */
@@ -238,6 +256,8 @@ class SimNode {
     std::vector<ros::Timer> barrel_heat_timer_;
     std::mutex mutex_;
 
+    //bonus msg
+    roborts_msgs::BonusStatus bs;
 };
 
 

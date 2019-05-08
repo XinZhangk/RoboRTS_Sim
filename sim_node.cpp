@@ -13,7 +13,16 @@ SimNode::SimNode(std::string name) {
   std::thread status_thread(&SimNode::ExecutePublishLoop, this);
   status_thread.detach();
 
+  std::thread red_reload_thread(boost::bind(&SimNode::ReloadDetector, this, true));
+  red_reload_thread.detach();
 
+  std::thread blue_reload_thread(boost::bind(&SimNode::ReloadDetector, this, false));
+  blue_reload_thread.detach();
+
+  std::thread red_buff_thread(boost::bind(&SimNode::BuffzoneDetector, this, true));
+  red_buff_thread.detach();
+  std::thread blue_buff_thread(boost::bind(&SimNode::BuffzoneDetector, this, true));
+  blue_buff_thread.detach();
 }
 
 bool SimNode::Init() {
@@ -36,9 +45,11 @@ bool SimNode::Init() {
     std::string robot_damage_topic_name   = "/" + robot_info_[i].name + "/" + "robot_damage";
     std::string robot_heat_topic_name     = "/" + robot_info_[i].name + "/" + "robot_heat";
     std::string reload_name               = "/" + robot_info_[i].name + "/" + "reload";
-    std::string bonus_topic               = "/" + robot_info_[i].name + "/" + "bonus";
+    std::string bonus_topic               = "/" + robot_info_[i].name + "/" + "robot_bonus";
+    std::string bonus_status_topic        = '/' + robot_info_[i].name + "/" + "field_bonus_status";
     std::string game_status_topic         = "/" + robot_info_[i].name + "/" + "game_status";
     std::string game_survivor_topic       = "/" + robot_info_[i].name + "/" + "game_survivor";
+    std::string supplier_status_topic     = "/" + robot_info_[i].name + "/" + "field_supplier_status";
     // fill up the vectors
     gazebo_real_pose_sub_.push_back(nh_.subscribe<nav_msgs::Odometry>(pose_topic, 100, boost::bind(&SimNode::PoseCallback,this,_1,i)));
     ros_gimbal_angle_sub_.push_back(nh_.subscribe(gimbal_angle_topic, 1, &SimNode::GimbalAngleCtrlCallback, this));
@@ -53,10 +64,12 @@ bool SimNode::Init() {
     ros_robot_damage_pub_.push_back(nh_.advertise<roborts_msgs::RobotDamage>(robot_damage_topic_name, 30));
     ros_robot_heat_pub_.push_back(nh_.advertise<roborts_msgs::RobotHeat>(robot_heat_topic_name, 30));
     ros_robot_bonus_pub_.push_back(nh_.advertise<roborts_msgs::RobotBonus>(bonus_topic,30));
+    ros_robot_bonus_status_pub_.push_back(nh_.advertise<roborts_msgs::BonusStatus>(bonus_status_topic,30));
     ros_robot_game_status_pub_.push_back(nh_.advertise<roborts_msgs::GameStatus>(game_status_topic, 30));
     ros_robot_game_survivor_pub_.push_back(nh_.advertise<roborts_msgs::GameSurvivor>(game_survivor_topic, 30));
+    ros_robot_supplier_status_pub_.push_back(nh_.advertise<roborts_msgs::SupplierStatus>(supplier_status_topic, 30));
     // fill up reload vector
-    reload_srv_.push_back(nh_.advertiseService<roborts_sim::ReloadCmd::Request, roborts_sim::ReloadCmd::Response>(reload_name, boost::bind(&SimNode::ReloadCmd,  this, _1, _2, i+1)));
+    //reload_srv_.push_back(nh_.advertiseService<roborts_sim::ReloadCmd::Request, roborts_sim::ReloadCmd::Response>(reload_name, boost::bind(&SimNode::ReloadCmd,  this, _1, _2, i+1)));
   }
   // for visualization
   path_pub_ = nh_.advertise<nav_msgs::Path>("los_path", 10);
@@ -141,6 +154,8 @@ void SimNode::ExecutePublishLoop() {
       PublishRobotStatus(id);
       PublishRobotHeat(id);
       SettleRobotHeat(id);
+      PublishBonus(id);
+      PublishBonusStatus(id);
     }
     ros::spinOnce();
     r.sleep();
@@ -231,6 +246,15 @@ void SimNode::PublishGameStatus(int robot){
   ros_robot_game_status_pub_[robot].publish(gsmsg);
 }
 
+void SimNode::PublishBonus(int robot){
+  roborts_msgs::RobotBonus rb;
+  rb.bonus = robot_info_[robot-1].bonus;
+  ros_robot_bonus_pub_[robot-1].publish(rb);
+}
+
+void SimNode::PublishBonusStatus(int robot){
+  ros_robot_bonus_status_pub_[robot-1].publish(bs);
+}
 void SimNode::AmmoDown(int robot, int num) {
   {
     std::lock_guard <std::mutex> guard(mutex_);
@@ -336,8 +360,15 @@ bool SimNode::TryReload(int robot){
   }else{
     robot_info_[robot-1].reload_time++;
     ROS_INFO("Robot %d has reloaded for %d times in 1 minute, succeed.", robot, robot_info_[robot-1].reload_time);
-    sleep(5);
+    roborts_msgs::SupplierStatus ss1;
+    ss1.status = 2;
+    ros_robot_supplier_status_pub_[robot-1].publish(ss1);
+    std::chrono::milliseconds dura(5000);
+    std::this_thread::sleep_for(dura);
     robot_info_[robot-1].ammo = 50;
+    roborts_msgs::SupplierStatus ss2;
+    ss2.status = 0;
+    ros_robot_supplier_status_pub_[robot-1].publish(ss2);
     return true;
   }
 }
@@ -538,7 +569,7 @@ bool SimNode::ShootCmd(roborts_msgs::ShootCmdSim::Request &req,
   res.success = TryShoot(robot1, robot2);
   return true;
 }
-
+/*
 bool SimNode::ReloadCmd(roborts_sim::ReloadCmd::Request &req, 
                   roborts_sim::ReloadCmd::Response &res,
                   int robot){
@@ -549,7 +580,139 @@ bool SimNode::ReloadCmd(roborts_sim::ReloadCmd::Request &req,
   res.supply_num = 50;
   return true;
 }
+*/
+bool SimNode::ReloadDetector(bool red){
+  ros::Rate r(50);
+  geometry_msgs::PoseStamped reload_spot;
+  int robot1;
+  int robot2;
+  if(red == true){
+    reload_spot.pose.position.x = 5;
+    reload_spot.pose.position.y = 5;
+    reload_spot.pose.position.z = 0;
+    robot1 = 0;
+    robot2 = 1;
+  }else{
+    reload_spot.pose.position.x = 5;
+    reload_spot.pose.position.y = 0;
+    reload_spot.pose.position.z = 0;
+    robot1 = 2;
+    robot2 = 3;
+  }
+  while(ros::ok()){
+    if(pow(robot_info_[robot1].pose.pose.position.x - reload_spot.pose.position.x, 2) +
+        pow(robot_info_[robot1].pose.pose.position.y - reload_spot.pose.position.y, 2) < 0.17){
+      if(robot_info_[robot1].reload_time>1){
+        ROS_INFO("Robot %d has reloaded for 2 times in 1 minute, failed.", robot1);
+        roborts_msgs::SupplierStatus ss;
+        ss.status = 0;
+        ros_robot_supplier_status_pub_[robot1].publish(ss);
+      }
+      else{
+        TryReload(robot1);
+      }
+    }
+    if(pow(robot_info_[robot2].pose.pose.position.x - reload_spot.pose.position.x, 2) +
+        pow(robot_info_[robot2].pose.pose.position.y - reload_spot.pose.position.y, 2) < 0.17){
+      if(robot_info_[robot2].reload_time>1){
+        ROS_INFO("Robot %d has reloaded for 2 times in 1 minute, failed.", robot2);
+        roborts_msgs::SupplierStatus ss;
+        ss.status = 0;
+        ros_robot_supplier_status_pub_[robot2].publish(ss);
+      }
+      else{
+        TryReload(robot2);
+      }
+    }
+    r.sleep();
+  }
+}
 
+bool SimNode::BuffzoneDetector(bool red){
+  ros::Rate r(10);
+  geometry_msgs::PoseStamped buff_zone;
+  if(red == true){
+    buff_zone.pose.position.x = 6.3;
+    buff_zone.pose.position.y = 1.125;
+    buff_zone.pose.position.z = 0;
+  }else{
+    buff_zone.pose.position.x = 1.7;
+    buff_zone.pose.position.y = 3.875;
+    buff_zone.pose.position.z = 0;
+  }
+  while(ros::ok()){
+    if(red){
+      bs.red_bonus = 0;
+    }else{
+      bs.blue_bonus = 0;
+    }
+    for(int i=0; i<4; i++){
+      if(pow(robot_info_[i].pose.pose.position.x - buff_zone.pose.position.x, 2) +
+        pow(robot_info_[i].pose.pose.position.y - buff_zone.pose.position.y, 2) < 0.17){
+        if(red){
+            bs.red_bonus = 2;
+          }else{
+            bs.blue_bonus = 2;
+          }
+        if(robot_info_[0].buff_time>0){
+          ROS_INFO("Red team has got bonus in 1 minute, failed.");
+        }
+        else{
+          if(red){
+            TryRedBuff();
+          }
+          else{
+            TryBlueBuff();
+          }
+        }
+      }
+    }
+    r.sleep();
+  }
+}
+
+void SimNode::TryRedBuff(){
+  ROS_INFO("Red team tries buffing");
+  robot_info_[0].buff_time++;
+  robot_info_[1].buff_time++;
+  std::chrono::milliseconds dura(5000);
+  std::this_thread::sleep_for(dura);
+  robot_info_[0].bonus = true;
+  robot_info_[1].bonus = true;
+  red_bonus_time = remaining_time;
+
+    
+}
+
+void SimNode::TryBlueBuff(){
+  ROS_INFO("Blue team tries buffing");
+  robot_info_[2].buff_time++;
+  robot_info_[3].buff_time++;
+  std::chrono::milliseconds dura(5000);
+  std::this_thread::sleep_for(dura);
+  robot_info_[2].bonus = true;
+  robot_info_[3].bonus = true;
+  blue_bonus_time = remaining_time;
+}
+
+void SimNode::resetBuff(bool red){
+  if(red){
+    robot_info_[0].bonus = false;
+    robot_info_[1].bonus = false;
+  }
+  else{
+    robot_info_[2].bonus = false;
+    robot_info_[3].bonus = false;
+  }
+  ROS_INFO("Bonus reseted");
+}
+
+void SimNode::resetBufftime(){
+  for(int i = 0; i < robot_info_.size(); i++){
+    robot_info_[i].buff_time = 0;
+  }
+  ROS_INFO("Bonus times reseted");
+}
 /*void SimNode::CountDown(){
   roborts_sim::Countdown cdm;
   cdm.gameState = "Game starts!";
@@ -598,6 +761,13 @@ void SimNode::GameCountDown(){
   while(ros::ok()){
     if(remaining_time % 60 == 0){
       resetReload();
+      resetBufftime();
+    }
+    if(remaining_time == red_bonus_time - 60){
+      resetBuff(true);
+    }
+    if(remaining_time == blue_bonus_time - 60){
+      resetBuff(false);
     }
     PublishGameSurvivor();
     for(int i = 1; i <= ROBOT_NUM; i++){
