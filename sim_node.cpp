@@ -432,11 +432,11 @@ bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
         {
           i_x = (tan(r1_yaw)*r1_pos.x-tan(r2_yaw_l)*r2_f_x+r2_f_y-r1_pos.y)/(tan(r1_yaw)-tan(r2_yaw_l));
           i_y = tan(r1_yaw)*(i_x-r1_pos.x)+r1_pos.y;
+          AmmoDown(robot_index, 1);
           if (sqrt(pow(r2_f_x - i_x,2)+pow(r2_f_y - i_y,2))<armor_width)
           {
             ROS_INFO("Valid hit, damage detected on %s front armor",target.name.c_str());
             ROS_WARN("current yaw for target is %.5f",r2_yaw);
-            AmmoDown(robot_index, 1);
             HpDown(robot_id, DAMAGE_PER_BULLET, 0, 0);
           }
           else
@@ -450,11 +450,11 @@ bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
         {
           i_x = (tan(r1_yaw)*r1_pos.x-tan(r2_yaw)*r2_l_x+r2_l_y-r1_pos.y)/(tan(r1_yaw)-tan(r2_yaw));
           i_y = tan(r1_yaw)*(i_x-r1_pos.x)+r1_pos.y;
+          AmmoDown(robot_index, 1);
           if (sqrt(pow(r2_l_x - i_x,2)+pow(r2_l_y - i_y,2))<armor_width)
           {
             ROS_INFO("Valid hit, damage detected on %s left armor",target.name.c_str());
             ROS_WARN("current yaw for target is %.5f",r2_yaw_l);
-            AmmoDown(robot_index, 1);
             HpDown(robot_id, DAMAGE_PER_BULLET, 0, 1);
 //            roborts_msgs::RobotDamage dmg_msg;
 //            dmg_msg.damage_type = 0;
@@ -471,11 +471,11 @@ bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
         {
           i_x = (tan(r1_yaw)*r1_pos.x-tan(r2_yaw_l)*r2_b_x+r2_b_y-r1_pos.y)/(tan(r1_yaw)-tan(r2_yaw_l));
           i_y = tan(r1_yaw)*(i_x-r1_pos.x)+r1_pos.y;
+          AmmoDown(robot_index, 1);
           if (sqrt(pow(r2_b_x - i_x,2)+pow(r2_b_y - i_y,2))<armor_width)
           {
             ROS_INFO("Valid hit, damage detected on %s back armor",target.name.c_str());
             ROS_WARN("current yaw for target is %.5f",r2_yaw_b);
-            AmmoDown(robot_index, 1);
             HpDown(robot_id, DAMAGE_PER_BULLET, 0, 2);
 //            roborts_msgs::RobotDamage dmg_msg;
 //            dmg_msg.damage_type = 0;
@@ -492,11 +492,11 @@ bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
         {
           i_x = (tan(r1_yaw)*r1_pos.x-tan(r2_yaw)*r2_r_x+r2_r_y-r1_pos.y)/(tan(r1_yaw)-tan(r2_yaw));
           i_y = tan(r1_yaw)*(i_x-r1_pos.x)+r1_pos.y;
+          AmmoDown(robot_index, 1);
           if (sqrt(pow(r2_r_x - i_x,2)+pow(r2_r_y - i_y,2))<armor_width)
           {
             ROS_INFO("Valid hit, damage detected on %s right armor",target.name.c_str());
             ROS_WARN("current yaw for target is %.5f",r2_yaw_r);
-            AmmoDown(robot_index, 1);
             HpDown(robot_id, DAMAGE_PER_BULLET, 0, 3);
 //            roborts_msgs::RobotDamage dmg_msg;
 //            dmg_msg.damage_type = 0;
