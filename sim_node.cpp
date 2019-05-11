@@ -244,7 +244,7 @@ void SimNode::PublishGameStatus(int robot){
     gsmsg.game_status = 4;
   }
   gsmsg.remaining_time = remaining_time;
-  ros_robot_game_status_pub_[robot].publish(gsmsg);
+  ros_robot_game_status_pub_[robot-1].publish(gsmsg);
 }
 
 void SimNode::PublishBonus(int robot){
