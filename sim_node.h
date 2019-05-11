@@ -257,7 +257,7 @@ class SimNode {
     std::mutex mutex_;
 
     //bonus msg
-    roborts_msgs::BonusStatus bs;
+    roborts_msgs::BonusStatus bonus_status_;
 };
 
 

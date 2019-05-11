@@ -57,8 +57,8 @@ bool SimNode::Init() {
     ros_ctrl_fric_wheel_srv_.push_back(nh_.advertiseService(fric_wheel_service_name, &SimNode::CtrlFricWheelService, this));
     //ros_ctrl_shoot_srv_.push_back(nh_.advertiseService(gimbal_shoot_service_name, &SimNode::CtrlShootService, this));
     ros_ctrl_shoot_srv_.push_back(nh_.advertiseService<roborts_msgs::ShootCmd::Request,roborts_msgs::ShootCmd::Response>(gimbal_shoot_service_name, boost::bind(&SimNode::CtrlShootService,  this, _1, _2, i+1)));
-    
-    
+
+
     ros_countdown_pub_.push_back(nh_.advertise<roborts_sim::Countdown>(countdown_topic_name, 1000));
     ros_robot_status_pub_.push_back(nh_.advertise<roborts_msgs::RobotStatus>(robot_status_topic_name, 30));
     ros_robot_damage_pub_.push_back(nh_.advertise<roborts_msgs::RobotDamage>(robot_damage_topic_name, 30));
@@ -233,16 +233,17 @@ void SimNode::PublishGameSurvivor(){
 
 void SimNode::PublishGameStatus(int robot){
   roborts_msgs::GameStatus gsmsg;
-  if(remaining_time > 300){
+  if (remaining_time > 300) {
     gsmsg.game_status = 3;
-    gsmsg.remaining_time = remaining_time;
-    if(robot == 1){
+    if (robot == 1) {
       ROS_INFO("Game starts in %d second(s).", remaining_time - 300);
     }
-  }else{
+  } else if (remaining_time <= 0) {
+    gsmsg.game_status = 5;
+  } else {
     gsmsg.game_status = 4;
-    gsmsg.remaining_time = remaining_time;
   }
+  gsmsg.remaining_time = remaining_time;
   ros_robot_game_status_pub_[robot].publish(gsmsg);
 }
 
@@ -253,7 +254,7 @@ void SimNode::PublishBonus(int robot){
 }
 
 void SimNode::PublishBonusStatus(int robot){
-  ros_robot_bonus_status_pub_[robot-1].publish(bs);
+  ros_robot_bonus_status_pub_[robot-1].publish(bonus_status_);
 }
 void SimNode::AmmoDown(int robot, int num) {
   {
@@ -409,7 +410,7 @@ bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
   double lr_offset = 0.15;
   double armor_width = 0.07;
   RobotInfo robot = robot_info_[robot_index-1];
-                             
+
   for(auto target:robot_info_)
   {
     if (target.name!=robot.name)
@@ -441,7 +442,7 @@ bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
         double r2_l_x = r2_pos.x+cos(r2_yaw_l)*lr_offset;
         double r2_l_y = r2_pos.y+sin(r2_yaw_l)*lr_offset;
         double dis_l = sqrt(pow(r2_l_x - r1_pos.x,2)+pow(r2_l_y - r1_pos.y,2));
-        
+
         //back
         double r2_yaw_b = r2_yaw_l + 90/180.0*pi;
         if(r2_yaw_b>PI) r2_yaw_b = r2_yaw_b - 2 * PI;
@@ -451,7 +452,7 @@ bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
 
         //right 
         double r2_yaw_r = r2_yaw_b + 90/180.0*pi;
-        if(r2_yaw_r>PI) r2_yaw_r = r2_yaw_r - 2 * PI;        
+        if(r2_yaw_r>PI) r2_yaw_r = r2_yaw_r - 2 * PI;
         double r2_r_x = r2_pos.x+cos(r2_yaw_r)*lr_offset;
         double r2_r_y = r2_pos.y+sin(r2_yaw_r)*lr_offset;
         double dis_r = sqrt(pow(r2_r_x - r1_pos.x,2)+pow(r2_r_y - r1_pos.y,2));
@@ -475,7 +476,7 @@ bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
             ROS_INFO("%s trying to shoot front armor, but missed!", robot.name.c_str());
             ROS_WARN("current yaw for target is %.5f",r2_yaw);
           }
-          
+
         }
         else if (dis_l < dis_f &&dis_l < dis_b &&dis_l < dis_r)
         {
@@ -544,12 +545,12 @@ bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
         {
           ROS_WARN("The distances: f: %f, l: %f, b: %f, r: %f",r2_yaw,r2_yaw_l,r2_yaw_b,r2_yaw_r);
         }
-        
+
         // check the side armor
       }
     }
   }
-  
+
   //ROS_WARN("Robot :%d trying to shoot",robot);
   return true;
 }
@@ -586,23 +587,23 @@ bool SimNode::ReloadDetector(bool red){
   geometry_msgs::PoseStamped reload_spot;
   int robot1;
   int robot2;
-  if(red == true){
-    reload_spot.pose.position.x = 5;
-    reload_spot.pose.position.y = 5;
+  if (red) {
+    reload_spot.pose.position.x = 4.0;
+    reload_spot.pose.position.y = 4.5;
     reload_spot.pose.position.z = 0;
     robot1 = 0;
     robot2 = 1;
-  }else{
-    reload_spot.pose.position.x = 5;
-    reload_spot.pose.position.y = 0;
+  } else {
+    reload_spot.pose.position.x = 4.0;
+    reload_spot.pose.position.y = 0.5;
     reload_spot.pose.position.z = 0;
     robot1 = 2;
     robot2 = 3;
   }
-  while(ros::ok()){
+  while (ros::ok()) {
     if(pow(robot_info_[robot1].pose.pose.position.x - reload_spot.pose.position.x, 2) +
         pow(robot_info_[robot1].pose.pose.position.y - reload_spot.pose.position.y, 2) < 0.17){
-      if(robot_info_[robot1].reload_time>1){
+      if(robot_info_[robot1].reload_time > 1) {
         ROS_INFO("Robot %d has reloaded for 2 times in 1 minute, failed.", robot1);
         roborts_msgs::SupplierStatus ss;
         ss.status = 0;
@@ -628,40 +629,40 @@ bool SimNode::ReloadDetector(bool red){
   }
 }
 
-bool SimNode::BuffzoneDetector(bool red){
+bool SimNode::BuffzoneDetector(bool red) {
   ros::Rate r(10);
   geometry_msgs::PoseStamped buff_zone;
-  if(red == true){
+  if (red) {
     buff_zone.pose.position.x = 6.3;
-    buff_zone.pose.position.y = 1.125;
+    buff_zone.pose.position.y = 1.75;
     buff_zone.pose.position.z = 0;
-  }else{
+  } else {
     buff_zone.pose.position.x = 1.7;
-    buff_zone.pose.position.y = 3.875;
+    buff_zone.pose.position.y = 3.25;
     buff_zone.pose.position.z = 0;
   }
-  while(ros::ok()){
-    if(red){
-      bs.red_bonus = 0;
-    }else{
-      bs.blue_bonus = 0;
+  while (ros::ok()) {
+    if (red) {
+      bonus_status_.red_bonus = 0;
+    } else {
+      bonus_status_.blue_bonus = 0;
     }
-    for(int i=0; i<4; i++){
-      if(pow(robot_info_[i].pose.pose.position.x - buff_zone.pose.position.x, 2) +
-        pow(robot_info_[i].pose.pose.position.y - buff_zone.pose.position.y, 2) < 0.17){
-        if(red){
-            bs.red_bonus = 2;
-          }else{
-            bs.blue_bonus = 2;
-          }
-        if(robot_info_[0].buff_time>0){
-          ROS_INFO("Red team has got bonus in 1 minute, failed.");
-        }
-        else{
-          if(red){
+    for (int i = 0; i < 4; i++) {
+      double to_buff_distance = pow(robot_info_[i].pose.pose.position.x - buff_zone.pose.position.x, 2) +
+                                pow(robot_info_[i].pose.pose.position.y - buff_zone.pose.position.y, 2);
+      if (to_buff_distance < 0.01) {
+        if (red) {
+          if (robot_info_[0].buff_time > 1) {
+            ROS_WARN("Red team has got twice bonus in 1 minute, failed.");
+          } else {
+            bonus_status_.red_bonus = 1;
             TryRedBuff();
           }
-          else{
+        } else {
+          if (robot_info_[2].buff_time > 1) {
+            ROS_WARN("Blue team has got twice bonus in 1 minute, failed.");
+          } else {
+            bonus_status_.blue_bonus = 1;
             TryBlueBuff();
           }
         }
@@ -673,34 +674,35 @@ bool SimNode::BuffzoneDetector(bool red){
 
 void SimNode::TryRedBuff(){
   ROS_INFO("Red team tries buffing");
-  robot_info_[0].buff_time++;
-  robot_info_[1].buff_time++;
   std::chrono::milliseconds dura(5000);
   std::this_thread::sleep_for(dura);
+  ROS_INFO("Red team buffed");
+  robot_info_[0].buff_time++;
+  robot_info_[1].buff_time++;
   robot_info_[0].bonus = true;
   robot_info_[1].bonus = true;
+  bonus_status_.red_bonus = 2;
   red_bonus_time = remaining_time;
-
-    
 }
 
 void SimNode::TryBlueBuff(){
   ROS_INFO("Blue team tries buffing");
-  robot_info_[2].buff_time++;
-  robot_info_[3].buff_time++;
   std::chrono::milliseconds dura(5000);
   std::this_thread::sleep_for(dura);
+  ROS_INFO("Blue team buffed");
+  robot_info_[2].buff_time++;
+  robot_info_[3].buff_time++;
   robot_info_[2].bonus = true;
   robot_info_[3].bonus = true;
+  bonus_status_.blue_bonus = 2;
   blue_bonus_time = remaining_time;
 }
 
 void SimNode::resetBuff(bool red){
-  if(red){
+  if (red) {
     robot_info_[0].bonus = false;
     robot_info_[1].bonus = false;
-  }
-  else{
+  } else {
     robot_info_[2].bonus = false;
     robot_info_[3].bonus = false;
   }
@@ -758,29 +760,30 @@ void SimNode::resetReload(){
 
 void SimNode::GameCountDown(){
   ros::Rate r(1);
-  while(ros::ok()){
-    if(remaining_time % 60 == 0){
-      resetReload();
-      resetBufftime();
-    }
-    if(remaining_time == red_bonus_time - 60){
-      resetBuff(true);
-    }
-    if(remaining_time == blue_bonus_time - 60){
-      resetBuff(false);
-    }
-    PublishGameSurvivor();
-    for(int i = 1; i <= ROBOT_NUM; i++){
-      PublishGameStatus(i);
-    }
-    remaining_time--;
-    if(remaining_time == 0){
-      for(int i = 1; i <= ROBOT_NUM; i++){
+  while(ros::ok()) {
+    if (remaining_time <= 0) {
+      for (int i = 1; i <= ROBOT_NUM; i++) {
         PublishGameStatus(i);
       }
       return;
+    } else {
+      if (remaining_time % 60 == 0) {
+        resetReload();
+        resetBufftime();
+      }
+      if (remaining_time == red_bonus_time - 30) {
+        resetBuff(true);
+      }
+      if (remaining_time == blue_bonus_time - 30) {
+        resetBuff(false);
+      }
+      PublishGameSurvivor();
+      for (int i = 1; i <= ROBOT_NUM; i++) {
+        PublishGameStatus(i);
+      }
+      remaining_time--;
+      r.sleep();
     }
-    r.sleep();
   }
 
 }
