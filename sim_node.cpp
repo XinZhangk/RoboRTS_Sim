@@ -358,7 +358,7 @@ bool SimNode::TryReload(int robot){
   if(robot_info_[robot-1].reload_time > 1){
     ROS_INFO("Robot %d has reloaded for 2 times in 1 minute, failed.", robot);
     return false;
-  }else{
+  } else {
     robot_info_[robot-1].reload_time++;
     ROS_INFO("Robot %d has reloaded for %d times in 1 minute, succeed.", robot, robot_info_[robot-1].reload_time);
     roborts_msgs::SupplierStatus ss1;
@@ -591,19 +591,19 @@ bool SimNode::ReloadDetector(bool red){
     reload_spot.pose.position.x = 4.0;
     reload_spot.pose.position.y = 4.5;
     reload_spot.pose.position.z = 0;
-    robot1 = 0;
-    robot2 = 1;
+    robot1 = 1;
+    robot2 = 2;
   } else {
     reload_spot.pose.position.x = 4.0;
     reload_spot.pose.position.y = 0.5;
     reload_spot.pose.position.z = 0;
-    robot1 = 2;
-    robot2 = 3;
+    robot1 = 3;
+    robot2 = 4;
   }
   while (ros::ok()) {
-    if(pow(robot_info_[robot1].pose.pose.position.x - reload_spot.pose.position.x, 2) +
-        pow(robot_info_[robot1].pose.pose.position.y - reload_spot.pose.position.y, 2) < 0.17){
-      if(robot_info_[robot1].reload_time > 1) {
+    if(pow(robot_info_[robot1-1].pose.pose.position.x - reload_spot.pose.position.x, 2) +
+        pow(robot_info_[robot1-1].pose.pose.position.y - reload_spot.pose.position.y, 2) < 0.05){
+      if (robot_info_[robot1-1].reload_time > 1) {
         ROS_INFO("Robot %d has reloaded for 2 times in 1 minute, failed.", robot1);
         roborts_msgs::SupplierStatus ss;
         ss.status = 0;
@@ -613,9 +613,9 @@ bool SimNode::ReloadDetector(bool red){
         TryReload(robot1);
       }
     }
-    if(pow(robot_info_[robot2].pose.pose.position.x - reload_spot.pose.position.x, 2) +
-        pow(robot_info_[robot2].pose.pose.position.y - reload_spot.pose.position.y, 2) < 0.17){
-      if(robot_info_[robot2].reload_time>1){
+    if(pow(robot_info_[robot2-1].pose.pose.position.x - reload_spot.pose.position.x, 2) +
+        pow(robot_info_[robot2-1].pose.pose.position.y - reload_spot.pose.position.y, 2) < 0.05){
+      if(robot_info_[robot2-1].reload_time > 1){
         ROS_INFO("Robot %d has reloaded for 2 times in 1 minute, failed.", robot2);
         roborts_msgs::SupplierStatus ss;
         ss.status = 0;
