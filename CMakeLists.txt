@@ -22,6 +22,7 @@ add_service_files(
   CheckBullet.srv
   ShootCmd.srv
   ReloadCmd.srv
+  HasLoS.srv
 )
 
 add_message_files(
@@ -40,6 +41,7 @@ add_executable(
   sim_node.cpp 
   sim_node.h
   sim_map.h
+  sim_map.cpp
 )
 
 add_dependencies(sim_node

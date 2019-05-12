@@ -51,29 +51,13 @@ bool SimNode::Init() {
     // fill up reload vector
     reload_srv_.push_back(nh_.advertiseService<roborts_sim::ReloadCmd::Request, roborts_sim::ReloadCmd::Response>(reload_name, boost::bind(&SimNode::ReloadCmd,  this, _1, _2, i+1)));
   }
-  // for visualization
-  path_pub_ = nh_.advertise<nav_msgs::Path>("los_path", 10);
-
 
   // following services are deprecated; we should stick to the protocols used
   // on real robots, rather than define our own
   shoot_srv_ = nh_.advertiseService("shoot", &SimNode::ShootCmd, this);
 
-  //for(int i = 1; i< 5; i++){
-    //std::string reload_namespace = "/r" + i + "/reload";
-    //reload_srv_.push_back(nh_.advertiseService(reload_namespace, boost::bind(&SimNode::ReloadCmd, _1, _2, i), this));
-  //}
-
   // Advertise Check Bullet service
   check_bullet_srv_ = nh_.advertiseService("check_bullet",&SimNode::CheckBullet,this);
-  //ROS_INFO("check bullet service ready");
-
-  // reloadTime.push_back(0);
-  // reloadTime.push_back(0);
-  // reloadTime.push_back(0);
-  // reloadTime.push_back(0);
-
-  //CountDown();
 
   std::thread game_thread(&SimNode::GameCountDown, this);
   game_thread.detach();
@@ -185,7 +169,7 @@ bool SimNode::GetStaticMap(){
   nav_msgs::GetMap::Response res;
   if(ros_static_map_srv_.call(req,res)) {
     ROS_INFO("Received Static Map");
-    map_ = SimMap(res.map);
+    map_.Init(res.map);
     first_map_received_ = true;
     return true;
   } else{
@@ -194,11 +178,7 @@ bool SimNode::GetStaticMap(){
   }
 }
 
-void SimNode::PublishPath(const std::vector<geometry_msgs::PoseStamped> &path) {
-  path_.poses = path;
-  path_.header.frame_id = "map";
-  path_pub_.publish(path_);
-}
+
 
 void SimNode::PublishGameStatus(int robot){
   roborts_msgs::GameStatus gsmsg;
@@ -264,7 +244,7 @@ void SimNode::HpDown(int robot, int damage, int damage_type){
   robot_damage.damage_type = damage_type;
   ros_robot_status_pub_[robot-1].publish(robot_damage);
   if (robot_info_[robot-1].hp < 0)
-  {
+  { // perhaps a better way to terminate the robot?
     roborts_sim::Countdown cdm;
     cdm.gameState = "Countdown ends!";
     ROS_INFO("robot %d is dead", robot);
@@ -274,10 +254,9 @@ void SimNode::HpDown(int robot, int damage, int damage_type){
 
 bool SimNode::TryShoot(int robot1, int robot2) {
   ROS_INFO("Robot %d tries to shoot Robot %d", robot1, robot2);
-  std::vector<geometry_msgs::PoseStamped> currentPath;
   auto r1_pos = robot_info_[robot1-1].pose.pose.position;
   auto r2_pos = robot_info_[robot2-1].pose.pose.position;
-  if (map_.hasLineOfSight(r1_pos.x, r1_pos.y, r2_pos.x, r2_pos.y, currentPath)){
+  if (map_.hasLineOfSight(r1_pos.x, r1_pos.y, r2_pos.x, r2_pos.y)){
     ROS_INFO("Robot %d and Robot %d can see each other", robot1, robot2);
     if (robot_info_[robot1-1].ammo > 0) {
       HpDown(robot2, DAMAGE_PER_BULLET, 0);
@@ -288,7 +267,6 @@ bool SimNode::TryShoot(int robot1, int robot2) {
   } else {
     ROS_WARN("Robot %d and Robot %d cannot see each other", robot1, robot2);
   }
-  PublishPath(currentPath);
 }
 
 
@@ -333,20 +311,18 @@ bool SimNode::CtrlFricWheelService(roborts_msgs::FricWhl::Request &req,
 bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
                               roborts_msgs::ShootCmd::Response &res,
                               const int robot_index){
-  std::vector<geometry_msgs::PoseStamped> currentPath;
   // the offset between robot armor and its base link
   double fb_offset = 0.25;
   double lr_offset = 0.15;
   double armor_width = 0.07;
   RobotInfo robot = robot_info_[robot_index-1];
                              
-  for(auto target:robot_info_)
-  {
+  for(auto target:robot_info_) {
     if (target.name!=robot.name)
     {
       auto r1_pos = robot.pose.pose.position;
       auto r2_pos = target.pose.pose.position;
-      if (map_.hasLineOfSight(r1_pos.x, r1_pos.y, r2_pos.x, r2_pos.y, currentPath))
+      if (map_.hasLineOfSight(r1_pos.x, r1_pos.y, r2_pos.x, r2_pos.y))
       {
         std::string id_str = target.name;
         id_str.erase(0,1);
@@ -356,13 +332,10 @@ bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
         double r2_yaw = GetYaw(target.pose.pose.orientation);
         double pi = PI;
 
-        r2_yaw = r2_yaw + PI;
-        if (r2_yaw > PI) r2_yaw=r2_yaw-2*PI;
-
         //front 
-        double r2_f_x = r2_pos.x+cos(r2_yaw)*fb_offset;
-        double r2_f_y = r2_pos.y+sin(r2_yaw)*fb_offset;
-        double dis_f = sqrt(pow(r2_f_x - r1_pos.x,2)+pow(r2_f_y - r1_pos.y,2));
+        double r2_f_x = r2_pos.x + cos(r2_yaw) * fb_offset;
+        double r2_f_y = r2_pos.y + sin(r2_yaw) * fb_offset;
+        double dis_f = sqrt(pow(r2_f_x-r1_pos.x,2) + pow(r2_f_y-r1_pos.y,2));
 
         //left
         double r2_yaw_l = r2_yaw + 90/180.0*pi;
@@ -387,7 +360,6 @@ bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
         double dis_r = sqrt(pow(r2_r_x - r1_pos.x,2)+pow(r2_r_y - r1_pos.y,2));
         ROS_WARN("The ywa: f: %f, l: %f, b: %f, r: %f",r2_yaw,r2_yaw_l,r2_yaw_b,r2_yaw_r);
 
-
         double i_x,i_y;
         if (dis_f < dis_l && dis_f < dis_b && dis_f < dis_r)
         {
@@ -409,7 +381,7 @@ bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
           }
           
         }
-        else if (dis_l < dis_f &&dis_l < dis_b &&dis_l < dis_r)
+        else if (dis_l < dis_f && dis_l < dis_b && dis_l < dis_r)
         {
           i_x = (tan(r1_yaw)*r1_pos.x-tan(r2_yaw)*r2_l_x+r2_l_y-r1_pos.y)/(tan(r1_yaw)-tan(r2_yaw));
           i_y = tan(r1_yaw)*(i_x-r1_pos.x)+r1_pos.y;
@@ -428,7 +400,7 @@ bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
             ROS_WARN("current yaw for target is %.5f",r2_yaw_l);
           }
         }
-        else if (dis_b < dis_l &&dis_b < dis_f &&dis_b < dis_r)
+        else if (dis_b < dis_l && dis_b < dis_f && dis_b < dis_r)
         {
           i_x = (tan(r1_yaw)*r1_pos.x-tan(r2_yaw_l)*r2_b_x+r2_b_y-r1_pos.y)/(tan(r1_yaw)-tan(r2_yaw_l));
           i_y = tan(r1_yaw)*(i_x-r1_pos.x)+r1_pos.y;
@@ -447,7 +419,7 @@ bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
             ROS_WARN("current yaw for target is %.5f",r2_yaw_b);
           }
         }
-        else if (dis_r < dis_l &&dis_r < dis_b &&dis_r < dis_f)
+        else if (dis_r < dis_l && dis_r < dis_b && dis_r < dis_f)
         {
           i_x = (tan(r1_yaw)*r1_pos.x-tan(r2_yaw)*r2_r_x+r2_r_y-r1_pos.y)/(tan(r1_yaw)-tan(r2_yaw));
           i_y = tan(r1_yaw)*(i_x-r1_pos.x)+r1_pos.y;
@@ -470,7 +442,6 @@ bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
         {
           ROS_WARN("The distances: f: %f, l: %f, b: %f, r: %f",r2_yaw,r2_yaw_l,r2_yaw_b,r2_yaw_r);
         }
-        
         // check the side armor
       }
     }
@@ -486,6 +457,7 @@ double SimNode::GetYaw(geometry_msgs::Quaternion orientation)
   tf::Matrix3x3 m(q);
   double roll, pitch, yaw;
   m.getRPY(roll, pitch, yaw);
+  return yaw;
 }
 
 bool SimNode::ShootCmd(roborts_msgs::ShootCmdSim::Request &req,
@@ -511,19 +483,6 @@ void SimNode::CountDown(){
   roborts_sim::Countdown cdm;
   cdm.gameState = "Game starts!";
   ROS_INFO("Game starts!");
-
-
-  // for (auto & pub : ros_countdown_pub_) {
-  //   pub.publish(cdm);
-  // }
-  
-  //ros::spinOnce();
-  //ros::spin();
-  //nh_.createTimer(ros::Duration(120), &SimNode::resetReload, this);
-  //ros::spinOnce();
-  
-
-    //cd.publish(cdm);
   
   for (int i = 0; i < ros_countdown_pub_.size(); i ++) {
     ros_countdown_pub_[i].publish(cdm);

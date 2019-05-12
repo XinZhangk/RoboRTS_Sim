@@ -16,7 +16,7 @@
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/GetMap.h>
 #include <nav_msgs/OccupancyGrid.h>
-#include <nav_msgs/Path.h>
+
 #include <geometry_msgs/PoseStamped.h>
 #include "roborts_msgs/ShootCmdSim.h"
 #include <ros/ros.h>
@@ -157,7 +157,6 @@ class SimNode {
     // todo to be added after gimbal simulation is added to gazebo
     void GimbalAngleCtrlCallback(const roborts_msgs::GimbalAngle::ConstPtr &msg);
 
-    void PublishPath(const std::vector<geometry_msgs::PoseStamped> &path);
 
   private:
     //ROS Node handle
@@ -174,8 +173,6 @@ class SimNode {
     /**
      ******* ROS Publisher *******
      */
-    // publish visualization for the LOS
-    ros::Publisher path_pub_;
 
     std::vector<ros::Publisher> ros_countdown_pub_;
     std::vector<ros::Publisher> ros_robot_status_pub_;
@@ -215,7 +212,7 @@ class SimNode {
      */
     std::vector<RobotInfo> robot_info_;
     SimMap map_;
-    nav_msgs::Path path_;
+    
 
     /**
      ******* Thread *****
