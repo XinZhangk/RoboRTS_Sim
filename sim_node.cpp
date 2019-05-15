@@ -7,6 +7,14 @@ SimNode::SimNode(std::string name) {
   ROS_INFO("Simulation node initialized");
   //StartSim();
 
+  char command = '0';
+
+  while (command!='1')
+  {
+    std::cout << "Please enter '1' to start the game" << std::endl;
+    std::cin >> command;
+  }
+
   std::thread game_thread(&SimNode::GameCountDown, this);
   game_thread.detach();
 
@@ -104,6 +112,10 @@ void SimNode::InitializeRobotInfo(){
 // I think it is easier programming-wise to consolidate all the combat information in the simulation node
 bool SimNode::CheckBullet(roborts_sim::CheckBullet::Request &req,roborts_sim::CheckBullet::Response &res){
   res.remaining_bullet = robot_info_[req.robot_id-1].ammo;
+  if (res.remaining_bullet==0)
+  {
+    ROS_INFO("request: robot %d has no bullet",req.robot_id);
+  }
   ROS_INFO("request: robot %d remaining bullet",req.robot_id);
   ROS_INFO("response: remaining bullet = %d",res.remaining_bullet);
   return true;
@@ -425,7 +437,7 @@ bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
         double r2_r_x = r2_pos.x+cos(r2_yaw_r)*lr_offset;
         double r2_r_y = r2_pos.y+sin(r2_yaw_r)*lr_offset;
         double dis_r = sqrt(pow(r2_r_x - r1_pos.x,2)+pow(r2_r_y - r1_pos.y,2));
-        ROS_WARN("The ywa: f: %f, l: %f, b: %f, r: %f",r2_yaw,r2_yaw_l,r2_yaw_b,r2_yaw_r);
+        //ROS_WARN("The ywa: f: %f, l: %f, b: %f, r: %f",r2_yaw,r2_yaw_l,r2_yaw_b,r2_yaw_r);
 
         double i_x,i_y;
         if (dis_f < dis_l && dis_f < dis_b && dis_f < dis_r)
@@ -511,7 +523,7 @@ bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
         }
         else
         {
-          ROS_WARN("The distances: f: %f, l: %f, b: %f, r: %f",r2_yaw,r2_yaw_l,r2_yaw_b,r2_yaw_r);
+          //ROS_WARN("The distances: f: %f, l: %f, b: %f, r: %f",r2_yaw,r2_yaw_l,r2_yaw_b,r2_yaw_r);
         }
         // check the side armor
       }

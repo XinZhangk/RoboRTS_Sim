@@ -25,10 +25,10 @@ void SimMap::Init(nav_msgs::OccupancyGrid &map_msg) {
     path_pub_ = nh.advertise<nav_msgs::Path>("los_path", 10);
 }
 bool SimMap::hasLineOfSight(double x1, double y1, double x2, double y2) {
-    ROS_INFO("check line of sight between (%.4f, %.4f) and (%.4f, %.4f)", x1, y1, x2, y2);
+    //ROS_INFO("check line of sight between (%.4f, %.4f) and (%.4f, %.4f)", x1, y1, x2, y2);
     if (x1==x2 && x2==y2)
     {
-      ROS_WARN("point 1 and 2 are the same");
+      //ROS_WARN("point 1 and 2 are the same");
       return false;
     }
     std::lock_guard <std::mutex> guard(mutex_);
