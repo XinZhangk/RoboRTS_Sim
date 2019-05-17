@@ -21,11 +21,13 @@ SimNode::SimNode(std::string name) {
   std::thread status_thread(&SimNode::ExecutePublishLoop, this);
   status_thread.detach();
 
+  /*
   std::thread red_reload_thread(boost::bind(&SimNode::ReloadDetector, this, true));
   red_reload_thread.detach();
 
   std::thread blue_reload_thread(boost::bind(&SimNode::ReloadDetector, this, false));
   blue_reload_thread.detach();
+  */
 
   std::thread red_buff_thread(boost::bind(&SimNode::BuffzoneDetector, this, true));
   red_buff_thread.detach();
@@ -57,7 +59,8 @@ bool SimNode::Init() {
     std::string bonus_status_topic        = '/' + robot_info_[i].name + "/" + "field_bonus_status";
     std::string game_status_topic         = "/" + robot_info_[i].name + "/" + "game_status";
     std::string game_survivor_topic       = "/" + robot_info_[i].name + "/" + "game_survivor";
-    std::string supplier_status_topic     = "/" + robot_info_[i].name + "/" + "field_supplier_status";
+    std::string supplier_status_topic     = "/" + robot_info_[i].name + "/" + "field_supplier_status";;
+    std::string reload_calling_topic      = "/" + robot_info_[i].name + "/" + "projectile_supply";
     // fill up the vectors
     gazebo_real_pose_sub_.push_back(nh_.subscribe<nav_msgs::Odometry>(pose_topic, 100, boost::bind(&SimNode::PoseCallback,this,_1,i)));
     ros_gimbal_angle_sub_.push_back(nh_.subscribe(gimbal_angle_topic, 1, &SimNode::GimbalAngleCtrlCallback, this));
@@ -76,6 +79,7 @@ bool SimNode::Init() {
     ros_robot_game_status_pub_.push_back(nh_.advertise<roborts_msgs::GameStatus>(game_status_topic, 30));
     ros_robot_game_survivor_pub_.push_back(nh_.advertise<roborts_msgs::GameSurvivor>(game_survivor_topic, 30));
     ros_robot_supplier_status_pub_.push_back(nh_.advertise<roborts_msgs::SupplierStatus>(supplier_status_topic, 30));
+    ros_robot_reload_calling_sub_.push_back(nh.subscribe<roborts_msgs::ProjectileSupply>(reload_calling_topic, 100, boost::bind(&SimNode::ReloadCallingCallback，this, _1, i)));
     // fill up reload vector
     //reload_srv_.push_back(nh_.advertiseService<roborts_sim::ReloadCmd::Request, roborts_sim::ReloadCmd::Response>(reload_name, boost::bind(&SimNode::ReloadCmd,  this, _1, _2, i+1)));
   }
@@ -346,13 +350,13 @@ bool SimNode::TryReload(int robot){
     ROS_INFO("Robot %d has reloaded for 2 times in 1 minute, failed.", robot);
     return false;
   } else {
+    int reload_time_point = remaining_time;
     robot_info_[robot-1].reload_time++;
     ROS_INFO("Robot %d has reloaded for %d times in 1 minute, succeed.", robot, robot_info_[robot-1].reload_time);
     roborts_msgs::SupplierStatus ss1;
     ss1.status = 2;
     ros_robot_supplier_status_pub_[robot-1].publish(ss1);
-    std::chrono::milliseconds dura(5000);
-    std::this_thread::sleep_for(dura);
+    while(reload_time_point - remaining_time < 5){}
     robot_info_[robot-1].ammo = 50;
     roborts_msgs::SupplierStatus ss2;
     ss2.status = 0;
@@ -550,18 +554,14 @@ bool SimNode::ShootCmd(roborts_msgs::ShootCmdSim::Request &req,
   res.success = TryShoot(robot1, robot2);
   return true;
 }
-/*
-bool SimNode::ReloadCmd(roborts_sim::ReloadCmd::Request &req, 
-                  roborts_sim::ReloadCmd::Response &res,
-                  int robot){
+
+void SimNode::ReloadCallingCallback(const roborts_msgs::ProjectileSupply& msg, int robot){
   //int robot = req.robot;
-  res.success = TryReload(robot);
-  res.supply_projectile_id = 1;
-  res.supply_robot_id = req.robot;
-  res.supply_num = 50;
-  return true;
+  TryReload(robot);
+  return;
 }
-*/
+
+/*
 bool SimNode::ReloadDetector(bool red){
   ros::Rate r(50);
   geometry_msgs::PoseStamped reload_spot;
@@ -608,7 +608,7 @@ bool SimNode::ReloadDetector(bool red){
     r.sleep();
   }
 }
-
+*/
 bool SimNode::BuffzoneDetector(bool red) {
   ros::Rate r(10);
   geometry_msgs::PoseStamped buff_zone;
@@ -654,8 +654,8 @@ bool SimNode::BuffzoneDetector(bool red) {
 
 void SimNode::TryRedBuff(){
   ROS_INFO("Red team tries buffing");
-  std::chrono::milliseconds dura(5000);
-  std::this_thread::sleep_for(dura);
+  int red_buff_time = remaining_time;
+  while(red_buff_time - remaining_time < 5){}
   ROS_INFO("Red team buffed");
   robot_info_[0].buff_time++;
   robot_info_[1].buff_time++;
@@ -667,8 +667,8 @@ void SimNode::TryRedBuff(){
 
 void SimNode::TryBlueBuff(){
   ROS_INFO("Blue team tries buffing");
-  std::chrono::milliseconds dura(5000);
-  std::this_thread::sleep_for(dura);
+  int blue_buff_time = remaining_time;
+  while(blue_buff_time - remaining_time < 5){}
   ROS_INFO("Blue team buffed");
   robot_info_[2].buff_time++;
   robot_info_[3].buff_time++;

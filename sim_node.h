@@ -133,10 +133,10 @@ class SimNode {
     void SettleRobotHeat(int robot);
     int ComputeBarrelDamage(int robot);
 
-    // Reloading Service Methods
-    //bool ReloadCmd(roborts_sim::ReloadCmd::Request &req, roborts_sim::ReloadCmd::Response &res, int robot);
+    // Reloading Methods
+    void ReloadCallingCallback(const roborts_msgs::ProjectileSupply& msg);
     bool TryReload(int robot);
-    bool ReloadDetector(bool red);
+    //bool ReloadDetector(bool red);
 
     //Buff Zone
     bool BuffzoneDetector(bool red);
@@ -200,6 +200,12 @@ class SimNode {
     std::vector<ros::Publisher> ros_robot_game_status_pub_;
     std::vector<ros::Publisher> ros_robot_game_survivor_pub_;
     std::vector<ros::Publisher> ros_robot_supplier_status_pub_;
+
+    /**
+     ******* ROS Subscriber *******
+     */
+    std::vector<ros::Subscriber> ros_robot_reload_calling_sub_;
+
     /**
      ******* ROS Service *******
      */
