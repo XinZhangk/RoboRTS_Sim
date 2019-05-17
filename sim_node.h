@@ -44,6 +44,7 @@
 #include "roborts_msgs/SupplierStatus.h"
 #include "roborts_msgs/GameStatus.h"
 #include "roborts_msgs/GameSurvivor.h"
+#include "roborts_msgs/ProjectileSupply.h"
 
 #define PI 3.1416
 #define THREAD_NUM 8 // ROS SPIN THREAD NUM
@@ -134,7 +135,7 @@ class SimNode {
     int ComputeBarrelDamage(int robot);
 
     // Reloading Methods
-    void ReloadCallingCallback(const roborts_msgs::ProjectileSupply& msg);
+    void ReloadCallingCallback(const roborts_msgs::ProjectileSupply::ConstPtr &msg, const int robot);
     bool TryReload(int robot);
     //bool ReloadDetector(bool red);
 
