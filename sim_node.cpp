@@ -396,8 +396,8 @@ bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
                               roborts_msgs::ShootCmd::Response &res,
                               const int robot_index){
   if (robot_info_[robot_index-1].ammo <= 0) {
-    ROS_WARN("Robot %d has no ammo but tries to shoot.", robot_index);
-    return false;
+    //ROS_WARN("Robot %d has no ammo but tries to shoot.", robot_index);
+    return true;
   }
 
   // the offset between robot armor and its base link
