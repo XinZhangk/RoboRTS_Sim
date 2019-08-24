@@ -67,7 +67,7 @@ bool SimMap::hasLineOfSight(double x1, double y1, double x2, double y2) {
     bool has_los = hasLineOfSight(req.x1, req.y1, req.x2, req.y2);
     res.has_los = has_los;
     PublishPath();
-    return has_los;
+    return true; // service is always called successfully
   }
 
   void SimMap::PublishPath() {
