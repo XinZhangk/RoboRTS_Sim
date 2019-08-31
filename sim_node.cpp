@@ -346,21 +346,26 @@ bool SimNode::TryShoot(int robot1, int robot2) {
 bool SimNode::TryReload(int robot){
   ROS_INFO("Robot %d tries reloading.", robot);
 
-  if(robot_info_[robot-1].reload_time > 1){
-    ROS_INFO("Robot %d has reloaded for 2 times in 1 minute, failed.", robot);
+  if(robot_info_[robot-1].reload_time > 0){
+    ROS_INFO("Robot %d has reloaded for 1 time in 1 minute, failed.", robot);
     return false;
   } else {
     int reload_time_point = remaining_time;
     robot_info_[robot-1].reload_time++;
     ROS_INFO("Robot %d has reloaded for %d times in 1 minute, succeed.", robot, robot_info_[robot-1].reload_time);
-    roborts_msgs::SupplierStatus ss1;
-    ss1.status = 2;
-    ros_robot_supplier_status_pub_[robot-1].publish(ss1);
-    while(reload_time_point - remaining_time < 5){}
+    //
+    roborts_msgs::SupplierStatus supplier_status_prior;
+    supplier_status_prior.status = 1;
+    ros_robot_supplier_status_pub_[robot-1].publish(supplier_status_prior);
+    sleep(3);
+    roborts_msgs::SupplierStatus supplier_status_during;
+    supplier_status_during.status = 2;
+    ros_robot_supplier_status_pub_[robot-1].publish(supplier_status_during);
+    sleep(2);
     robot_info_[robot-1].ammo = 50;
-    roborts_msgs::SupplierStatus ss2;
-    ss2.status = 0;
-    ros_robot_supplier_status_pub_[robot-1].publish(ss2);
+    roborts_msgs::SupplierStatus supplier_status_after;
+    supplier_status_after.status = 0;
+    ros_robot_supplier_status_pub_[robot-1].publish(supplier_status_after);
     return true;
   }
 }
@@ -391,8 +396,8 @@ bool SimNode::CtrlShootService(roborts_msgs::ShootCmd::Request &req,
                               roborts_msgs::ShootCmd::Response &res,
                               const int robot_index){
   if (robot_info_[robot_index-1].ammo <= 0) {
-    ROS_WARN("Robot %d has no ammo but tries to shoot.", robot_index);
-    return false;
+    //ROS_WARN("Robot %d has no ammo but tries to shoot.", robot_index);
+    return true;
   }
 
   // the offset between robot armor and its base link
