@@ -70,7 +70,7 @@ bool SimNode::Init() {
     ros_ctrl_shoot_srv_.push_back(nh_.advertiseService<roborts_msgs::ShootCmd::Request,roborts_msgs::ShootCmd::Response>(gimbal_shoot_service_name, boost::bind(&SimNode::CtrlShootService,  this, _1, _2, i+1)));
 
 
-    ros_countdown_pub_.push_back(nh_.advertise<roborts_sim::Countdown>(countdown_topic_name, 1000));
+    ros_countdown_pub_.push_back(nh_.advertise<roborts_msgs::SimCountdown>(countdown_topic_name, 1000));
     ros_robot_status_pub_.push_back(nh_.advertise<roborts_msgs::RobotStatus>(robot_status_topic_name, 30));
     ros_robot_damage_pub_.push_back(nh_.advertise<roborts_msgs::RobotDamage>(robot_damage_topic_name, 30));
     ros_robot_heat_pub_.push_back(nh_.advertise<roborts_msgs::RobotHeat>(robot_heat_topic_name, 30));
@@ -80,8 +80,6 @@ bool SimNode::Init() {
     ros_robot_game_survivor_pub_.push_back(nh_.advertise<roborts_msgs::GameSurvivor>(game_survivor_topic, 30));
     ros_robot_supplier_status_pub_.push_back(nh_.advertise<roborts_msgs::SupplierStatus>(supplier_status_topic, 30));
     ros_robot_reload_calling_sub_.push_back(nh_.subscribe<roborts_msgs::ProjectileSupply>(reload_calling_topic, 100, boost::bind(&SimNode::ReloadCallingCallback, this, _1, i+1)));
-    // fill up reload vector
-    //reload_srv_.push_back(nh_.advertiseService<roborts_sim::ReloadCmd::Request, roborts_sim::ReloadCmd::Response>(reload_name, boost::bind(&SimNode::ReloadCmd,  this, _1, _2, i+1)));
   }
 
   // following services are deprecated; we should stick to the protocols used
@@ -114,7 +112,7 @@ void SimNode::InitializeRobotInfo(){
 // The rationale is that the whole weaponry system is controlled by the simulation node, virtually.
 // Although this is counter-intuitive as the robot is supposed to have full control over the bullets they shoot out,
 // I think it is easier programming-wise to consolidate all the combat information in the simulation node
-bool SimNode::CheckBullet(roborts_sim::CheckBullet::Request &req,roborts_sim::CheckBullet::Response &res){
+bool SimNode::CheckBullet(roborts_msgs::SimCheckBullet::Request &req,roborts_msgs::SimCheckBullet::Response &res){
   res.remaining_bullet = robot_info_[req.robot_id-1].ammo;
   if (res.remaining_bullet==0)
   {
@@ -317,7 +315,7 @@ void SimNode::HpDown(int robot, int damage, int damage_type, int damage_source) 
   ros_robot_damage_pub_[robot-1].publish(robot_damage);
   if (robot_info_[robot-1].hp < 0) {
     robot_info_[robot-1].hp = 0;
-    roborts_sim::Countdown cdm;
+    roborts_msgs::SimCountdown cdm;
     cdm.gameState = "Countdown ends!";
     ROS_INFO("robot %d is dead", robot);
     ros_countdown_pub_[robot-1].publish(cdm);
@@ -552,8 +550,8 @@ double SimNode::GetYaw(geometry_msgs::Quaternion orientation)
   return yaw;
 }
 
-bool SimNode::ShootCmd(roborts_msgs::ShootCmdSim::Request &req,
-                  roborts_msgs::ShootCmdSim::Response &res){
+bool SimNode::ShootCmd(roborts_msgs::SimShootCmd::Request &req,
+                  roborts_msgs::SimShootCmd::Response &res){
   int robot1 = req.robot;
   int robot2 = req.enemy;
   res.success = TryShoot(robot1, robot2);
@@ -689,30 +687,15 @@ void SimNode::resetBuff(bool red){
     robot_info_[2].bonus = false;
     robot_info_[3].bonus = false;
   }
-  ROS_INFO("Bonus reseted");
+  ROS_INFO("Bonus reset");
 }
 
 void SimNode::resetBufftime(){
   for(int i = 0; i < robot_info_.size(); i++){
     robot_info_[i].buff_time = 0;
   }
-  ROS_INFO("Bonus times reseted");
+  ROS_INFO("Bonus times reset");
 }
-/*void SimNode::CountDown(){
-  roborts_sim::Countdown cdm;
-  cdm.gameState = "Game starts!";
-  ROS_INFO("Game starts!");
-  
-  for (int i = 0; i < ros_countdown_pub_.size(); i ++) {
-    ros_countdown_pub_[i].publish(cdm);
-    ROS_INFO("%s", cdm.gameState.c_str());
-    countdown_timer_.push_back(nh_.createTimer(ros::Duration(180), boost::bind(&SimNode::gameEnd, this, _1, i)));
-    ros::spinOnce();
-    //ros::spin();
-  }
-  reload_timer_ = nh_.createTimer(ros::Duration(60), &SimNode::resetReload, this);
-  ros::spinOnce();
-}*/
 
 void SimNode::resetReload(){
   for(int i = 0; i < robot_info_.size(); i++){
@@ -720,13 +703,6 @@ void SimNode::resetReload(){
   }
   ROS_INFO("Reload times reseted");
 }
-
-/*void SimNode::gameEnd(const ros::TimerEvent&, int i){
-  roborts_sim::Countdown cdm;
-  cdm.gameState = "Countdown ends!";
-  ROS_INFO("Countdown ends!");
-  ros_countdown_pub_[i].publish(cdm);
-}*/
 
 void SimNode::GameCountDown(){
   ros::Rate r(1);

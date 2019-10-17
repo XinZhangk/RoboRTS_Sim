@@ -62,8 +62,8 @@ bool SimMap::hasLineOfSight(double x1, double y1, double x2, double y2) {
     return true;
   }
 
-  bool SimMap::CtrlLoSService(roborts_sim::HasLoS::Request& req, 
-                      roborts_sim::HasLoS::Response& res) {
+  bool SimMap::CtrlLoSService(roborts_msgs::SimHasLoS::Request& req, 
+                      roborts_msgs::SimHasLoS::Response& res) {
     bool has_los = hasLineOfSight(req.x1, req.y1, req.x2, req.y2);
     res.has_los = has_los;
     PublishPath();

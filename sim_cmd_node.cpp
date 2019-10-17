@@ -11,20 +11,20 @@
 #include <nav_msgs/OccupancyGrid.h>
 #include <nav_msgs/Path.h>
 #include <geometry_msgs/PoseStamped.h>
-#include "roborts_msgs/ShootCmdSim.h"
+#include "roborts_msgs/SimShootCmd.h"
 #include <ros/ros.h>
 
 
 int main(int argc, char **argv) {
   ros::init(argc, argv, "sim_cmd_node");
   ros::NodeHandle nh;
-  ros::ServiceClient client = nh.serviceClient<roborts_msgs::ShootCmdSim>("shoot");
+  ros::ServiceClient client = nh.serviceClient<roborts_msgs::SimShootCmd>("shoot");
 
   ros::Rate r(10);
   ROS_INFO("Robot 1 tries to shoot Robot 2");
   while (ros::ok()) {
     // construct srv
-    roborts_msgs::ShootCmdSim srv;
+    roborts_msgs::SimShootCmd srv;
     // robots are indexed as 1, 2, 3, 4
     srv.request.robot = 1;
     srv.request.enemy = 2;

@@ -20,14 +20,14 @@
 #include <nav_msgs/OccupancyGrid.h>
 
 #include <geometry_msgs/PoseStamped.h>
-#include "roborts_msgs/ShootCmdSim.h"
+#include "roborts_msgs/SimShootCmd.h"
 #include <ros/ros.h>
 #include <tf/tf.h>
 
 // TODO: Use another header file to include such a bunch of protocol head files
-#include "roborts_sim/CheckBullet.h"
-#include "roborts_sim/ReloadCmd.h"
-#include "roborts_sim/Countdown.h"
+#include "roborts_msgs/SimCheckBullet.h"
+#include "roborts_msgs/SimReloadCmd.h"
+#include "roborts_msgs/SimCountdown.h"
 
 #include "roborts_msgs/GimbalAngle.h"
 #include "roborts_msgs/GimbalRate.h"
@@ -125,7 +125,7 @@ class SimNode {
     void HpDown(int robot, int damage, int damage_type, int damage_source = 0);
 
     // Shooting Service Methods
-    bool ShootCmd(roborts_msgs::ShootCmdSim::Request &req, roborts_msgs::ShootCmdSim::Response &res);
+    bool ShootCmd(roborts_msgs::SimShootCmd::Request &req, roborts_msgs::SimShootCmd::Response &res);
     bool TryShoot(int robot1, int robot2);
 
     // Overheating rule functions
@@ -147,7 +147,7 @@ class SimNode {
     void resetBuff(bool red);
 
     // Check bullet service methods
-    bool CheckBullet(roborts_sim::CheckBullet::Request &req,roborts_sim::CheckBullet::Response &res);
+    bool CheckBullet(roborts_msgs::SimCheckBullet::Request &req,roborts_msgs::SimCheckBullet::Response &res);
 
     // Robot Status Publisher
     void ExecutePublishLoop();

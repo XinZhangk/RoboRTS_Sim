@@ -8,7 +8,7 @@
 
 #include <nav_msgs/OccupancyGrid.h>
 #include <geometry_msgs/PoseStamped.h>
-#include "roborts_sim/HasLoS.h"
+#include "roborts_msgs/SimHasLoS.h"
 #include <nav_msgs/Path.h>
 #include <mutex>
 
@@ -37,8 +37,8 @@ private:
   ros::ServiceServer has_los_srv_;
   // publish visualization for the LOS
   ros::Publisher path_pub_;
-  bool CtrlLoSService(roborts_sim::HasLoS::Request& req, 
-                      roborts_sim::HasLoS::Response& res);
+  bool CtrlLoSService(roborts_msgs::SimHasLoS::Request& req, 
+                      roborts_msgs::SimHasLoS::Response& res);
   void PublishPath();
   
 };

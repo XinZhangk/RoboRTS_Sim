@@ -12,30 +12,12 @@ find_package(catkin REQUIRED COMPONENTS
   actionlib
   roborts_msgs
   std_msgs
-  message_generation
   )
 
 find_package(Threads REQUIRED)
 
-add_service_files(
-  FILES
-  CheckBullet.srv
-  ShootCmd.srv
-  ReloadCmd.srv
-  HasLoS.srv
-)
+catkin_package()
 
-add_message_files(
-  FILES
-  Countdown.msg
-)
-
-generate_messages(
-  DEPENDENCIES
-  std_msgs
-)
-
-catkin_package(CATKIN_DEPENDS message_runtime)
 add_executable(
   sim_node
   sim_node.cpp 
@@ -45,7 +27,7 @@ add_executable(
 )
 
 add_dependencies(sim_node
-  roborts_msgs_generate_messages)
+  roborts_msgs_generate_messages_cpp)
 
 target_link_libraries(sim_node PUBLIC
         ${catkin_LIBRARIES}
@@ -61,7 +43,7 @@ add_executable(
 )
 
 add_dependencies(sim_cmd_node
-  roborts_msgs_generate_messages)
+  roborts_msgs_generate_messages_cpp)
 
 target_link_libraries(sim_cmd_node PUBLIC
         ${catkin_LIBRARIES}

@@ -1,4 +1,0 @@
-uint8 robot
-uint8 enemy
----
-bool success
